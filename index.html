@@ -6,22 +6,20 @@
     <title>TETRIS ULTRA v4.0</title>
 
     <!-- 
-      TETRIS ULTRA v4.0: AAA Cinematic Edition
+      TETRIS ULTRA v4.0: Cinematic Edition + Global Leaderboard
       
       V4.0 UPGRADES:
-      - Removed ALL flashing 'beat-pulse' boxes.
-      - Total music overhaul: More "dramatic" with synth pads, arpeggiators, and a new bassline.
-      - Added 3D camera tilt that reacts to piece movement.
-      - Added "Digital Rain" weather overlay (toggleable in settings).
-      - Added "Combo Aura": Game board glows on 3x+ combos.
-      - Added Volume Sliders for Music & FX (replaces toggles).
-      - Added "Pause Muffling": Music muffles with a low-pass filter on pause.
-      - Added Echo/Delay SFX for Tetris clears.
-      - Added full mobile gesture controls (swipe/tap), removed old buttons.
-      - Added "Idle/Sleep Mode": Game dims and sound fades after 30s of inactivity.
-      - Added "Dynamic Hue Shift": Colors subtly evolve as levels increase.
-      - Added "Achievement Unlocked" sound effect.
-      - Kept: Reactive Silence, 3D Positional Audio, Glassmorphism, Time-of-Day Themes.
+      - Replaced localStorage leaderboard with Dreamlo Global Leaderboard.
+      - Added score submission to Dreamlo on game over.
+      - Added score fetching from Dreamlo for the leaderboard screen.
+      - Added new "top-3" glowing style for the leaderboard.
+      - Kept 10-character name limit.
+
+      V3.3 UPGRADES:
+      - Added 3D camera tilt with gesture/mouse control.
+      - Added new 3D positional audio for music (bass/ambient).
+      - Added mobile gesture controls (swipe/tap).
+      - Added combo aura effect to game canvas.
     -->
 
     <style>
@@ -32,10 +30,9 @@
             --font-main: 'Orbitron', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
             
             /* Themeable Colors */
-            --base-hue: 200; /* New: for hue shift */
-            --color-primary: hsl(var(--base-hue), 100%, 50%); /* #00ffff */
-            --color-secondary: hsl(calc(var(--base-hue) + 100), 100%, 50%); /* #ff00ff */
-            --color-tertiary: hsl(calc(var(--base-hue) - 140), 100%, 50%); /* #ffff00 */
+            --color-primary: #00ffff;
+            --color-secondary: #ff00ff;
+            --color-tertiary: #ffff00;
             --color-light: #ffffff;
             
             /* Base Colors */
@@ -59,11 +56,15 @@
             --cursor-light-size: 400px;
             
             /* New: Camera Tilt */
-            --camera-rotate-y: -3deg;
-            --camera-translate-z: -50px;
+            --camera-rotate-y: -3deg; /* Default tilt */
+            --camera-rotate-x: 3deg;  /* Default tilt */
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         html, body {
             width: 100%;
@@ -73,19 +74,26 @@
             color: var(--text-primary);
             font-family: var(--font-main);
             user-select: none;
+            /* Interactive Cursor Light */
             background-image: radial-gradient(
                 circle var(--cursor-light-size) at var(--mouse-x) var(--mouse-y),
                 rgba(255, 255, 255, 0.05),
                 transparent
             );
             transition: --cursor-light-size 0.3s ease-out;
+            
+            /* New: 3D Perspective */
+            perspective: 2000px;
         }
         
         #game-wrapper {
             position: relative;
             width: 100%;
             height: 100%;
-            perspective: 1000px; /* New: For 3D camera */
+            /* New: 3D Transform */
+            transform-style: preserve-3d;
+            transition: transform 0.1s linear;
+            transform: rotateX(var(--camera-rotate-x)) rotateY(var(--camera-rotate-y));
         }
 
         h1, h2, h3 {
@@ -96,19 +104,54 @@
 
         /* --- 2. KEYFRAME ANIMATIONS --- */
 
-        /* ... (pulse, glow, gameOverGlow, screenShake, logoReveal, slideInAndOut unchanged) ... */
-        @keyframes pulse { 0% { text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); transform: scale(1); } 50% { text-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary); transform: scale(1.02); } 100% { text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); transform: scale(1); } }
-        @keyframes glow { 0% { box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset, 0 0 5px var(--color-primary); border-color: var(--color-primary); } 50% { box-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary) inset, 0 0 10px var(--color-secondary); border-color: var(--color-secondary); } 100% { box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset, 0 0 5px var(--color-primary); border-color: var(--color-primary); } }
-        @keyframes gameOverGlow { 0% { text-shadow: 0 0 10px #f00, 0 0 20px #f00; } 50% { text-shadow: 0 0 20px #f00, 0 0 40px #f00; transform: scale(1.05); } 100% { text-shadow: 0 0 10px #f00, 0 0 20px #f00; } }
-        @keyframes screenShake { 0% { transform: translate(0, 0) rotate(0); } 10% { transform: translate(-2px, 2px) rotate(-0.1deg); } 20% { transform: translate(2px, -2px) rotate(0.1deg); } 30% { transform: translate(-2px, 2px) rotate(0.1deg); } 40% { transform: translate(2px, -2px) rotate(-0.1deg); } 50% { transform: translate(-2px, -2px) rotate(-0.1deg); } 60% { transform: translate(2px, 2px) rotate(0.1deg); } 70% { transform: translate(-2px, 2px) rotate(-0.1deg); } 80% { transform: translate(2px, -2px) rotate(0.1deg); } 90% { transform: translate(-2px, 2px) rotate(0); } 100% { transform: translate(0, 0) rotate(0); } }
-        @keyframes logoReveal { from { opacity: 0; filter: blur(15px); transform: scale(1.5); text-shadow: 0 0 10px var(--color-light), 0 0 20px var(--color-light); } to { opacity: 1; filter: blur(0); transform: scale(1); text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); } }
+        @keyframes pulse {
+            0% { text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); transform: scale(1); }
+            50% { text-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary); transform: scale(1.02); }
+            100% { text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); transform: scale(1); }
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset, 0 0 5px var(--color-primary); border-color: var(--color-primary); }
+            50% { box-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary) inset, 0 0 10px var(--color-secondary); border-color: var(--color-secondary); }
+            100% { box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset, 0 0 5px var(--color-primary); border-color: var(--color-primary); }
+        }
+        @keyframes gameOverGlow {
+            0% { text-shadow: 0 0 10px #f00, 0 0 20px #f00; }
+            50% { text-shadow: 0 0 20px #f00, 0 0 40px #f00; transform: scale(1.05); }
+            100% { text-shadow: 0 0 10px #f00, 0 0 20px #f00; }
+        }
+        @keyframes screenShake {
+            0% { transform: translateZ(0) translate(0, 0) rotate(0); } 
+            10% { transform: translateZ(10px) translate(-2px, 2px) rotate(-0.1deg); }
+            20% { transform: translateZ(5px) translate(2px, -2px) rotate(0.1deg); } 
+            30% { transform: translateZ(0) translate(-2px, 2px) rotate(0.1deg); }
+            40% { transform: translateZ(5px) translate(2px, -2px) rotate(-0.1deg); } 
+            50% { transform: translateZ(10px) translate(-2px, -2px) rotate(-0.1deg); }
+            60% { transform: translateZ(5px) translate(2px, 2px) rotate(0.1deg); } 
+            70% { transform: translateZ(0) translate(-2px, 2px) rotate(-0.1deg); }
+            80% { transform: translateZ(5px) translate(2px, -2px) rotate(0.1deg); } 
+            90% { transform: translateZ(10px) translate(-2px, 2px) rotate(0); }
+            100% { transform: translateZ(0) translate(0, 0) rotate(0); }
+        }
+        
+        @keyframes logoReveal {
+            from { opacity: 0; filter: blur(15px); transform: scale(1.5) translateZ(50px); text-shadow: 0 0 10px var(--color-light), 0 0 20px var(--color-light); }
+            to { opacity: 1; filter: blur(0); transform: scale(1) translateZ(0); text-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary); }
+        }
+
         @keyframes slideInAndOut { 0% { transform: translateX(110%); opacity: 0; } 10% { transform: translateX(0); opacity: 1; } 90% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(110%); opacity: 0; } }
         
         /* New: Combo Aura */
         @keyframes comboAura {
-            0% { box-shadow: 0 0 20px var(--color-tertiary), 0 0 30px var(--color-tertiary) inset; }
-            50% { box-shadow: 0 0 30px var(--color-tertiary), 0 0 50px var(--color-tertiary) inset; }
-            100% { box-shadow: 0 0 20px var(--color-tertiary), 0 0 30px var(--color-tertiary) inset; }
+            0% { box-shadow: 0 0 20px var(--color-primary), 0 0 30px var(--color-primary) inset; }
+            50% { box-shadow: 0 0 30px var(--color-tertiary), 0 0 45px var(--color-tertiary) inset; }
+            100% { box-shadow: 0 0 20px var(--color-primary), 0 0 30px var(--color-primary) inset; }
+        }
+
+        /* New: Top 3 Glow */
+        @keyframes top3Glow {
+            0% { box-shadow: 0 0 10px var(--color-tertiary), 0 0 5px var(--color-tertiary) inset; border-color: var(--color-tertiary); }
+            50% { box-shadow: 0 0 20px var(--color-light), 0 0 10px var(--color-light) inset; border-color: var(--color-light); }
+            100% { box-shadow: 0 0 10px var(--color-tertiary), 0 0 5px var(--color-tertiary) inset; border-color: var(--color-tertiary); }
         }
 
         /* --- 3. MAIN LAYOUT & CONTAINERS --- */
@@ -120,62 +163,46 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* New: Camera Tilt */
-            transform-style: preserve-3d;
-            transform: rotateX(8deg) rotateY(var(--camera-rotate-y)) translateZ(var(--camera-translate-z));
-            transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: transform 0.1s ease-out;
+            transform-style: preserve-3d; /* For screen shake */
         }
         
         #game-container.shake {
             animation: screenShake 0.4s cubic-bezier(.36,.07,.19,.97) both;
         }
-        
-        /* New: Sleep Mode */
-        #game-container.sleep-active {
-            filter: brightness(0.7) blur(2px);
-        }
-        #sleep-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 3rem;
-            color: var(--color-primary);
-            text-shadow: 0 0 10px var(--color-primary);
-            opacity: 0;
-            transition: opacity 0.5s;
-            z-index: 1000;
-            pointer-events: none;
-        }
-        #game-container.sleep-active #sleep-message {
-            opacity: 1;
-        }
 
         #background-canvas {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0; opacity: 0.6;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.6;
+            /* Parallax transition */
             transition: transform 0.2s cubic-bezier(0, 0, 0.5, 1);
+            /* Move back in 3D space */
+            transform: translateZ(-500px) scale(1.5);
         }
         
-        /* New: Weather Canvas */
-        #weather-canvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 2;
-            pointer-events: none;
-            opacity: 0.1;
+        /* Beat-responsive pulse for borders */
+        .beat-pulse {
+            transition: box-shadow 0.05s ease-in, border-color 0.05s ease-in;
+            transform: translateZ(0); /* Promote to 3D layer */
         }
-
-        /* Removed beat-pulse CSS */
+        body.beat-active .beat-pulse {
+            box-shadow: 0 0 25px var(--color-primary), 0 0 40px var(--color-primary) inset, 0 0 25px var(--color-primary);
+            border-color: var(--color-light);
+            transition: box-shadow 0.1s ease-out, border-color 0.1s ease-out;
+        }
 
         /* Screen Manager (Transitions) */
         .screen {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -183,12 +210,21 @@
             padding: 20px;
             z-index: 10;
             opacity: 0;
-            transform: scale(1.05);
+            transform: scale(1.05) translateZ(50px); /* 3D transition */
             pointer-events: none;
             transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            transform-style: preserve-3d;
         }
-        .screen.active { opacity: 1; transform: scale(1); pointer-events: auto; }
-        .screen.fade-out { opacity: 0; transform: scale(0.95); pointer-events: none; }
+        .screen.active {
+            opacity: 1;
+            transform: scale(1) translateZ(0);
+            pointer-events: auto;
+        }
+        .screen.fade-out {
+            opacity: 0;
+            transform: scale(0.95) translateZ(-50px);
+            pointer-events: none;
+        }
 
         /* Glassmorphism UI Panel */
         .modal-panel {
@@ -205,105 +241,140 @@
             gap: 1.5rem;
             min-width: 300px;
             max-width: 90vw;
+            transform: translateZ(10px); /* Lift panel */
         }
-        .modal-panel h2 { font-size: 2.5rem; text-align: center; margin-bottom: 1rem; color: var(--color-primary); }
+
+        .modal-panel h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            color: var(--color-primary);
+        }
 
         /* --- 4. UI ELEMENTS --- */
 
         .neon-button {
-            /* ... (unchanged) ... */
-            background: transparent; border: 2px solid var(--color-primary); color: var(--color-primary); padding: 0.8rem 1.5rem; font-family: var(--font-main); font-size: 1.2rem; font-weight: 700; text-transform: uppercase; border-radius: var(--border-radius-m); cursor: pointer; transition: all 0.3s ease; text-shadow: 0 0 5px var(--color-primary); box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset; width: 100%; text-align: center;
+            background: transparent;
+            border: 2px solid var(--color-primary);
+            color: var(--color-primary);
+            padding: 0.8rem 1.5rem;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-radius: var(--border-radius-m);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px var(--color-primary);
+            box-shadow: 0 0 5px var(--color-primary), 0 0 10px var(--color-primary) inset;
+            width: 100%;
+            text-align: center;
+            transform: translateZ(0); /* 3D layer */
         }
-        .neon-button:hover, .neon-button:focus { background: var(--color-primary); color: var(--color-bg-deep); box-shadow: 0 0 10px var(--color-primary), 0 0 20px var(--color-primary), 0 0 30px var(--color-primary); text-shadow: none; outline: none; }
-        .neon-button.secondary { border-color: var(--color-secondary); color: var(--color-secondary); text-shadow: 0 0 5px var(--color-secondary); box-shadow: 0 0 5px var(--color-secondary), 0 0 10px var(--color-secondary) inset; }
-        .neon-button.secondary:hover, .neon-button.secondary:focus { background: var(--color-secondary); color: var(--color-bg-deep); box-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary), 0 0 30px var(--color-secondary); }
+        .neon-button:hover, .neon-button:focus {
+            background: var(--color-primary); color: var(--color-bg-deep);
+            box-shadow: 0 0 10px var(--color-primary), 0 0 20px var(--color-primary), 0 0 30px var(--color-primary);
+            text-shadow: none; outline: none;
+            transform: scale(1.02) translateZ(5px); /* Lift on hover */
+        }
+        .neon-button.secondary {
+            border-color: var(--color-secondary); color: var(--color-secondary);
+            text-shadow: 0 0 5px var(--color-secondary);
+            box-shadow: 0 0 5px var(--color-secondary), 0 0 10px var(--color-secondary) inset;
+        }
+        .neon-button.secondary:hover, .neon-button.secondary:focus {
+            background: var(--color-secondary); color: var(--color-bg-deep);
+            box-shadow: 0 0 10px var(--color-secondary), 0 0 20px var(--color-secondary), 0 0 30px var(--color-secondary);
+        }
 
         /* Settings Controls */
         .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%; }
         .setting-row label { font-size: 1rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; }
-        
-        /* New: Volume Sliders */
-        input[type="range"] {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 120px;
-            height: 10px;
-            background: var(--color-bg-light);
-            border: 1px solid var(--color-primary);
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: var(--color-primary);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--color-primary);
-        }
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            background: var(--color-primary);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--color-primary);
-            border: none;
-        }
-        
-        /* New: Toggle Switch (for Rain) */
         .toggle-switch { position: relative; display: inline-block; width: 50px; height: 24px; }
         .toggle-switch input { display: none; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--color-bg-light); border: 1px solid var(--color-primary); transition: .4s; border-radius: 24px; }
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: var(--color-primary); transition: .4s; border-radius: 50%; box-shadow: 0 0 5px var(--color-primary); }
         input:checked + .slider { background-color: var(--color-primary); box-shadow: 0 0 10px var(--color-primary) inset; }
         input:checked + .slider:before { transform: translateX(26px); background-color: var(--color-bg-deep); box-shadow: none; }
-        
-        .neon-select { /* ... (unchanged) ... */ background: transparent; border: 2px solid var(--color-primary); color: var(--color-primary); padding: 0.5rem; font-family: var(--font-main); font-size: 1rem; font-weight: 700; border-radius: var(--border-radius-s); box-shadow: 0 0 5px var(--color-primary) inset; }
+        .neon-select { background: transparent; border: 2px solid var(--color-primary); color: var(--color-primary); padding: 0.5rem; font-family: var(--font-main); font-size: 1rem; font-weight: 700; border-radius: var(--border-radius-s); box-shadow: 0 0 5px var(--color-primary) inset; }
         .neon-select option { background: var(--color-bg-mid); color: var(--text-primary); }
-        .neon-input { /* ... (unchanged) ... */ background: rgba(0,0,0,0.2); border: 2px solid var(--color-primary); color: var(--color-primary); padding: 0.8rem; font-family: var(--font-main); font-size: 1.2rem; font-weight: 700; border-radius: var(--border-radius-m); box-shadow: 0 0 5px var(--color-primary) inset; width: 100%; text-align: center; text-transform: uppercase; }
+        .neon-input { background: rgba(0,0,0,0.2); border: 2px solid var(--color-primary); color: var(--color-primary); padding: 0.8rem; font-family: var(--font-main); font-size: 1.2rem; font-weight: 700; border-radius: var(--border-radius-m); box-shadow: 0 0 5px var(--color-primary) inset; width: 100%; text-align: left; text-transform: uppercase; }
         .neon-input::placeholder { color: var(--color-primary); opacity: 0.5; }
         .neon-input:focus { outline: none; box-shadow: 0 0 5px var(--color-primary) inset, 0 0 10px var(--color-primary); }
 
         /* --- 5. SPECIFIC SCREEN STYLES --- */
 
         /* Start Screen */
-        #start-screen { gap: 2rem; }
-        .logo-title { font-size: 5rem; font-weight: 900; color: var(--color-light); text-align: center; line-height: 1; }
-        .logo-part { display: inline-block; opacity: 0; filter: blur(15px); transform: scale(1.5); }
-        .screen.active .logo-part.logo-tetris { animation: logoReveal 1s 0.2s ease-out forwards; }
-        .screen.active .logo-part.logo-ultra { animation: logoReveal 1s 0.5s ease-out forwards; }
-        .screen.active #start-screen-buttons { animation: logoReveal 1s 0.8s ease-out forwards; opacity: 0; }
-        #start-screen-buttons { display: flex; flex-direction: column; gap: 1.5rem; width: 250px; }
+        #start-screen {
+            gap: 2rem;
+        }
+        .logo-title {
+            font-size: 5rem;
+            font-weight: 900;
+            color: var(--color-light);
+            text-align: center;
+            line-height: 1;
+            transform-style: preserve-3d;
+        }
+        .logo-part {
+            display: inline-block;
+            opacity: 0;
+            filter: blur(15px);
+            transform: scale(1.5) translateZ(50px);
+        }
+        .screen.active .logo-part.logo-tetris {
+            animation: logoReveal 1s 0.2s ease-out forwards;
+        }
+        .screen.active .logo-part.logo-ultra {
+            animation: logoReveal 1s 0.5s ease-out forwards;
+        }
+        .screen.active #start-screen-buttons {
+            animation: logoReveal 1s 0.8s ease-out forwards;
+            opacity: 0;
+        }
+        #start-screen-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            width: 250px;
+        }
 
-        /* ... (Game Over, Leaderboard styles unchanged) ... */
+        /* Game Over, Leaderboard, How-to-Play */
         #game-over-screen h2 { font-size: 4rem; color: #ff0000; animation: gameOverGlow 2s infinite ease-in-out; }
         #final-score-display { font-size: 1.5rem; color: var(--color-tertiary); text-shadow: 0 0 5px var(--color-tertiary); text-align: center; }
         #leaderboard-entry { width: 100%; display: flex; flex-direction: column; gap: 1rem; }
-        #leaderboard-list { list-style: none; width: 100%; display: flex; flex-direction: column; gap: 1rem; }
-        #leaderboard-list li { display: flex; justify-content: space-between; font-size: 1.2rem; padding: 0.5rem 1rem; background: rgba(0, 255, 255, 0.1); border-radius: var(--border-radius-s); border: 1px solid rgba(0, 255, 255, 0.2); }
+        #leaderboard-list { list-style: none; width: 100%; display: flex; flex-direction: column; gap: 1rem; max-height: 40vh; overflow-y: auto; }
+        #leaderboard-list li { display: flex; justify-content: space-between; font-size: 1.2rem; padding: 0.5rem 1rem; background: rgba(0, 255, 255, 0.1); border-radius: var(--border-radius-s); border: 1px solid rgba(0, 255, 255, 0.2); transition: all 0.3s ease; }
         #leaderboard-list li .score { color: var(--color-tertiary); font-weight: 700; }
         #leaderboard-list li .rank { color: var(--color-primary); font-weight: 700; min-width: 2rem; }
         #leaderboard-list li .name { flex-grow: 1; margin-left: 1rem; color: var(--text-dim); }
 
+        /* New: Top 3 Styling */
+        #leaderboard-list li.top-3 {
+            border-color: var(--color-tertiary);
+            background: rgba(255, 255, 0, 0.1);
+            animation: top3Glow 2s infinite alternate;
+        }
+
         /* How to Play */
         #how-to-play-content { display: flex; flex-direction: column; gap: 1.5rem; color: var(--text-dim); font-size: 1rem; }
         .control-row { display: flex; align-items: center; gap: 1rem; }
-        .control-key { background: var(--color-bg-light); border: 1px solid var(--color-primary); border-radius: var(--border-radius-s); padding: 0.5rem 0.8rem; font-family: var(--font-main); color: var(--color-primary); font-weight: 700; min-width: 40px; text-align: center; transition: all 0.1s ease-out; }
-        /* New: Keypress animation */
-        .control-key:active {
-            transform: scale(0.9) translateY(2px);
-            box-shadow: 0 0 10px var(--color-primary) inset;
-        }
+        .control-key { background: var(--color-bg-light); border: 1px solid var(--color-primary); border-radius: var(--border-radius-s); padding: 0.5rem 0.8rem; font-family: var(--font-main); color: var(--color-primary); font-weight: 700; min-width: 40px; text-align: center; }
         .control-desc { font-size: 1.1rem; color: var(--text-primary); }
 
         /* --- 6. GAME PLAY SCREEN & LAYOUT --- */
 
         #game-play-screen {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%; z-index: 5;
-            flex-direction: row; align-items: center; justify-content: center;
-            gap: 2rem; padding: 1rem;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            padding: 1rem;
+            transform-style: preserve-3d;
         }
 
         #game-canvas {
@@ -312,12 +383,12 @@
             border: 2px solid var(--color-primary);
             border-radius: var(--border-radius-m);
             box-shadow: 0 0 20px var(--color-primary), 0 0 30px var(--color-primary) inset;
+            transform: translateZ(0); /* 3D layer */
         }
         
         /* New: Combo Aura */
         #game-canvas.combo-active {
-            border-color: var(--color-tertiary);
-            animation: comboAura 1s infinite alternate;
+            animation: comboAura 1.5s infinite alternate;
         }
         
         #game-info-panel-left,
@@ -326,7 +397,11 @@
             flex-direction: column;
             gap: 1.5rem;
             width: 200px;
+            transform-style: preserve-3d;
         }
+        /* Tilt panels */
+        #game-info-panel-left { transform: rotateY(20deg) translateZ(10px); }
+        #game-info-panel-right { transform: rotateY(-20deg) translateZ(10px); }
 
         .info-box {
             background: rgba(0, 255, 255, 0.05);
@@ -336,15 +411,28 @@
             padding: 1rem;
             text-align: center;
             box-shadow: 0 0 10px var(--color-primary) inset;
+            transition: transform 0.3s ease;
+        }
+        .info-box:hover {
+            transform: scale(1.03) translateZ(15px);
         }
         .info-box h3 { font-size: 1rem; color: var(--color-primary); margin-bottom: 0.5rem; text-shadow: 0 0 5px var(--color-primary); }
         .info-box-value { font-size: 2rem; font-weight: 700; color: var(--color-light); text-shadow: 0 0 5px var(--color-light); }
-        .info-box-canvas { background: rgba(0, 0, 0, 0.2); border: 2px solid var(--color-primary); border-radius: var(--border-radius-m); box-shadow: 0 0 10px var(--color-primary) inset; }
+        
+        .info-box-canvas {
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px solid var(--color-primary);
+            border-radius: var(--border-radius-m);
+            box-shadow: 0 0 10px var(--color-primary) inset;
+        }
         
         /* --- 7. ACHIEVEMENT UI --- */
         
         #achievement-popup {
-            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
             background: rgba(255, 255, 0, 0.1);
             backdrop-filter: blur(15px);
             border: 2px solid var(--color-tertiary);
@@ -352,7 +440,8 @@
             padding: 1.5rem;
             box-shadow: 0 0 20px var(--color-tertiary), 0 0 30px var(--color-tertiary) inset;
             color: var(--color-tertiary);
-            transform: translateX(110%); opacity: 0;
+            transform: translateX(110%);
+            opacity: 0;
             transition: all 0.5s ease-out;
         }
         #achievement-popup.show { animation: slideInAndOut 5s ease-in-out forwards; }
@@ -360,17 +449,38 @@
         #achievement-popup p { font-size: 1rem; color: var(--color-tertiary); }
 
 
-        /* --- 8. MOBILE/RESPONSIVE STYLING --- */
+        /* --- 8. MOBILE/RESPONSIVE STYLES --- */
 
-        #touch-controls { display: none; } /* Removed, replaced by gestures */
+        #touch-controls {
+            display: none; /* Hidden by default, enabled by JS */
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+            padding: 0 20px;
+            transform: translateZ(20px);
+        }
+        .touch-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; width: 100%; max-width: 500px; margin: 0 auto; opacity: 0.7; }
+        .touch-button { background: rgba(0, 255, 255, 0.2); border: 2px solid var(--color-primary); border-radius: var(--border-radius-l); color: var(--color-primary); font-family: var(--font-main); font-size: 1.5rem; font-weight: 700; padding: 1rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px var(--color-primary) inset; }
+        #touch-rotate { grid-column: 4 / 5; grid-row: 1 / 3; }
+        #touch-hold { grid-column: 1 / 2; grid-row: 1 / 3; }
+        #touch-left { grid-column: 2 / 3; grid-row: 2 / 3; }
+        #touch-right { grid-column: 3 / 4; grid-row: 2 / 3; }
+        #touch-down { grid-column: 2 / 4; grid-row: 1 / 2; }
+        #touch-drop { display: none; } /* Replaced by swipe down */
 
+        
         @media (max-width: 860px) {
             .logo-title { font-size: 3.5rem; }
             .modal-panel { padding: 1.5rem; width: 90vw; max-height: 90vh; overflow-y: auto; }
             .modal-panel h2 { font-size: 2rem; }
             #game-play-screen { flex-direction: column; padding: 10px; gap: 10px; justify-content: flex-start; padding-top: 5vh; }
-            #game-info-panel-left { order: 1; width: 100%; max-width: 400px; flex-direction: row; justify-content: space-around; }
-            #game-info-panel-right { order: 1; width: 100%; max-width: 400px; flex-direction: row; justify-content: space-around; }
+            
+            /* Untilt panels for mobile */
+            #game-info-panel-left { order: 1; width: 100%; max-width: 400px; flex-direction: row; justify-content: space-around; transform: none; }
+            #game-info-panel-right { order: 1; width: 100%; max-width: 400px; flex-direction: row; justify-content: space-around; transform: none; }
+            
             #game-canvas { order: 2; }
             .info-box { flex: 1; padding: 0.5rem; }
             .info-box-value { font-size: 1.5rem; }
@@ -378,16 +488,22 @@
             #score-box { flex-grow: 2; }
             #hold-piece-box, #next-piece-box { display: flex; flex-direction: column; align-items: center; justify-content: center; }
             #hold-piece-canvas, #next-piece-canvas { width: 80px !important; height: 80px !important; }
-            /* #touch-controls { display: block; }  REMOVED */
+            /* #touch-controls { display: block; } */ /* JS will handle this */
             #pause-game-btn { display: block; position: absolute; top: 10px; right: 10px; z-index: 101; width: 50px; height: 50px; font-size: 1.5rem; padding: 0; }
-            #achievement-popup { top: auto; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(110%); width: 90vw; }
-            @keyframes slideInAndOut { 0% { transform: translateX(-50%) translateY(110%); opacity: 0; } 10% { transform: translateX(-50%) translateY(0); opacity: 1; } 90% { transform: translateX(-50%) translateY(0); opacity: 1; } 100% { transform: translateX(-50%) translateY(110%); opacity: 0; } }
+            #achievement-popup { top: auto; bottom: 150px; left: 50%; transform: translateX(-50%) translateY(110%); width: 90vw; }
+            @keyframes slideInAndOut {
+                0% { transform: translateX(-50%) translateY(110%); opacity: 0; }
+                10% { transform: translateX(-50%) translateY(0); opacity: 1; }
+                90% { transform: translateX(-50%) translateY(0); opacity: 1; }
+                100% { transform: translateX(-50%) translateY(110%); opacity: 0; }
+            }
         }
         
         @media (max-height: 500px) and (min-width: 861px) {
              #game-play-screen { flex-direction: row; justify-content: center; align-items: flex-start; padding-top: 10px; }
-             #game-info-panel-left, #game-info-panel-right { flex-direction: column; width: 150px; }
+             #game-info-panel-left, #game-info-panel-right { flex-direction: column; width: 150px; transform: none; }
              #game-canvas { order: 0; }
+             #touch-controls { display: none; }
         }
 
     </style>
@@ -398,48 +514,55 @@
         <div id="game-container">
             
             <canvas id="background-canvas"></canvas>
-            <canvas id="weather-canvas"></canvas> <!-- New -->
-
+            
             <div id="game-play-screen" class="screen">
                 <button id="pause-game-btn" class="neon-button" style="display: none;">||</button>
                 
                 <div id="game-info-panel-left">
-                    <div id="hold-piece-box" class="info-box"> <!-- beat-pulse removed -->
+                    <div id="hold-piece-box" class="info-box beat-pulse">
                         <h3>Hold</h3>
                         <canvas id="hold-piece-canvas" class="info-box-canvas"></canvas>
                     </div>
-                     <div class="info-box"> <!-- beat-pulse removed -->
+                     <div class="info-box beat-pulse">
                         <h3>Level</h3>
                         <div id="level-value" class="info-box-value">1</div>
                     </div>
                 </div>
                 
-                <canvas id="game-canvas"></canvas> <!-- beat-pulse removed -->
+                <canvas id="game-canvas" class="beat-pulse"></canvas>
 
                 <div id="game-info-panel-right">
-                    <div id="score-box" class="info-box"> <!-- beat-pulse removed -->
+                    <div id="score-box" class="info-box beat-pulse">
                         <h3>Score</h3>
                         <div id="score-value" class="info-box-value">0</div>
                     </div>
                     
-                    <div id="next-piece-box" class="info-box"> <!-- beat-pulse removed -->
+                    <div id="next-piece-box" class="info-box beat-pulse">
                         <h3>Next</h3>
                         <canvas id="next-piece-canvas" class="info-box-canvas"></canvas>
                     </div>
 
-                    <div class="info-box"> <!-- beat-pulse removed -->
+                    <div class="info-box beat-pulse">
                         <h3>Lines</h3>
                         <div id="lines-value" class="info-box-value">0</div>
                     </div>
                     
-                    <div class="info-box"> <!-- beat-pulse removed -->
+                    <div class="info-box beat-pulse">
                         <h3>Combo</h3>
                         <div id="combo-value" class="info-box-value">0</div>
                     </div>
                 </div>
             </div>
             
-            <!-- <div id="touch-controls"> ... </div> REMOVED -->
+            <div id="touch-controls">
+                <div class="touch-grid">
+                    <button id="touch-hold" class="touch-button">H</button>
+                    <button id="touch-down" class="touch-button">&#x2193;</button>
+                    <button id="touch-rotate" class="touch-button">&#x21BB;</button>
+                    <button id="touch-left" class="touch-button">&#x2190;</button>
+                    <button id="touch-right" class="touch-button">&#x2192;</button>
+                </div>
+            </div>
 
             <div id="start-screen" class="screen">
                 <h1 class="logo-title">
@@ -453,7 +576,7 @@
             </div>
 
             <div id="main-menu-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>Main Menu</h2>
                     <button id="menu-new-game-btn" class="neon-button">New Game</button>
                     <button id="menu-leaderboard-btn" class="neon-button">Leaderboard</button>
@@ -464,7 +587,7 @@
             </div>
             
             <div id="pause-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>Paused</h2>
                     <button id="pause-resume-btn" class="neon-button">Resume</button>
                     <button id="pause-restart-btn" class="neon-button">Restart</button>
@@ -477,8 +600,8 @@
                     <h2>Game Over</h2>
                     <div id="final-score-display">Final Score: 12345</div>
                     <div id="leaderboard-entry">
-                        <label for="player-name-input">Enter Your Name (3 Chars):</label>
-                        <input type="text" id="player-name-input" class="neon-input" maxlength="3" placeholder="AAA">
+                        <label for="player-name-input">Enter Your Name (10 Chars):</label>
+                        <input type="text" id="player-name-input" class="neon-input" maxlength="10" placeholder="PLAYER">
                         <button id="submit-score-btn" class="neon-button">Save Score</button>
                     </div>
                     <button id="game-over-restart-btn" class="neon-button">Restart</button>
@@ -487,7 +610,7 @@
             </div>
             
             <div id="leaderboard-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>Leaderboard</h2>
                     <ul id="leaderboard-list"></ul>
                     <button id="leaderboard-back-btn" class="neon-button">Back</button>
@@ -495,7 +618,7 @@
             </div>
             
             <div id="achievements-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>Achievements</h2>
                     <ul id="achievements-list"></ul>
                     <button id="achievements-back-btn" class="neon-button">Back</button>
@@ -503,20 +626,16 @@
             </div>
             
             <div id="settings-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>Settings</h2>
-                    
-                    <!-- New: Volume Sliders -->
                     <div class="setting-row">
-                        <label for="sound-volume">Sound FX</label>
-                        <input type="range" id="sound-volume" min="0" max="1" step="0.01" value="0.5">
+                        <label for="sound-toggle">Sound FX</label>
+                        <label class="toggle-switch"><input type="checkbox" id="sound-toggle" checked><span class="slider"></span></label>
                     </div>
                     <div class="setting-row">
-                        <label for="music-volume">Music</label>
-                        <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.15">
+                        <label for="music-toggle">Music</label>
+                        <label class="toggle-switch"><input type="checkbox" id="music-toggle" checked><span class="slider"></span></label>
                     </div>
-                    <hr style="border-color: var(--color-primary); opacity: 0.3;">
-                    
                     <div class="setting-row">
                         <label for="difficulty-select">Difficulty</label>
                         <select id="difficulty-select" class="neon-select">
@@ -529,22 +648,12 @@
                             <option value="neon" selected>Neon</option><option value="cyberpunk">Cyberpunk</option><option value="retro">Retro</option><option value="pastel">Pastel</option><option value="mono">Mono</option>
                         </select>
                     </div>
-                    
-                    <!-- New: Digital Rain Toggle -->
-                    <div class="setting-row">
-                        <label for="rain-toggle">Digital Rain</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="rain-toggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
                     <button id="settings-back-btn" class="neon-button">Back</button>
                 </div>
             </div>
             
             <div id="how-to-play-screen" class="screen">
-                <div class="modal-panel"> <!-- beat-pulse removed -->
+                <div class="modal-panel beat-pulse">
                     <h2>How to Play</h2>
                     <div id="how-to-play-content">
                         <div class="control-row"><span class="control-key">&larr;</span> / <span class="control-key">&rarr;</span><span class="control-desc">Move Left / Right</span></div>
@@ -556,13 +665,11 @@
                         <div class="control-row"><span class="control-key">P</span><span class="control-desc">Pause Game</span></div>
                         <div class="control-row"><span class="control-key">R</span><span class="control-desc">Restart Game</span></div>
                         <br>
-                        <div class="control-desc">Mobile: Swipe Left/Right to move. Tap to rotate. Swipe Down to drop.</div>
+                        <div class="control-desc">Mobile: Use on-screen buttons or gestures (swipe left/right, swipe down, tap).</div>
                     </div>
                     <button id="how-to-play-back-btn" class="neon-button">Back</button>
                 </div>
             </div>
-            
-            <div id="sleep-message">Zzz...</div> <!-- New -->
 
         </div> <!-- End #game-container -->
 
@@ -583,7 +690,7 @@
         window.addEventListener('DOMContentLoaded', () => {
 
             // --- 1. DOM ELEMENT SELECTION ---
-            // ... (Most are identical) ...
+            const gameWrapper = document.getElementById('game-wrapper'); // New for 3D tilt
             const gameContainer = document.getElementById('game-container');
             const gameCanvas = document.getElementById('game-canvas');
             const gameCtx = gameCanvas.getContext('2d');
@@ -593,9 +700,6 @@
             const holdCtx = holdCanvas.getContext('2d');
             const bgCanvas = document.getElementById('background-canvas');
             const bgCtx = bgCanvas.getContext('2d');
-            const weatherCanvas = document.getElementById('weather-canvas'); // New
-            const weatherCtx = weatherCanvas.getContext('2d'); // New
-            
             const screens = {
                 start: document.getElementById('start-screen'),
                 menu: document.getElementById('main-menu-screen'),
@@ -641,17 +745,22 @@
                 achievementDesc: document.getElementById('achievement-desc'),
             };
             const settings = {
-                soundVolume: document.getElementById('sound-volume'), // New
-                musicVolume: document.getElementById('music-volume'), // New
+                sound: document.getElementById('sound-toggle'),
+                music: document.getElementById('music-toggle'),
                 difficulty: document.getElementById('difficulty-select'),
                 theme: document.getElementById('theme-select'),
-                rain: document.getElementById('rain-toggle'), // New
             };
-            
-            // Removed touch buttons
+            const touch = {
+                controls: document.getElementById('touch-controls'),
+                left: document.getElementById('touch-left'),
+                right: document.getElementById('touch-right'),
+                down: document.getElementById('touch-down'),
+                rotate: document.getElementById('touch-rotate'),
+                hold: document.getElementById('touch-hold'),
+            };
+
             
             // --- 2. GAME CONSTANTS & THEMES ---
-            // ... (Identical) ...
             const COLS = 10; const ROWS = 20; let BLOCK_SIZE = 30;
             const NEXT_CANVAS_SIZE = 120; const HOLD_CANVAS_SIZE = 120;
             const PIECES = [
@@ -664,67 +773,124 @@
                 { shape: [[7,7,0],[0,7,7],[0,0,0]], name: 'Z' }
             ];
             const THEMES = {
-                neon: { 0: '#00000000', 1: '#00ffff', 2: '#ffff00', 3: '#ff00ff', 4: '#0000ff', 5: '#ff7f00', 6: '#00ff00', 7: '#ff0000', grid: '#1a1a3a', background: '#0a0a1a', hue: 200 },
-                cyberpunk: { 0: '#00000000', 1: '#f000ff', 2: '#00f0ff', 3: '#ff0055', 4: '#a000ff', 5: '#00ff90', 6: '#fff000', 7: '#0070ff', grid: '#200020', background: '#0a000a', hue: 280 },
-                retro: { 0: '#00000000', 1: '#e08040', 2: '#60e0a0', 3: '#d060c0', 4: '#e0c040', 5: '#5060e0', 6: '#c04040', 7: '#70e040', grid: '#303030', background: '#000000', hue: 30 },
-                pastel: { 0: '#00000000', 1: '#fd9ab2', 2: '#f0c05a', 3: '#a8d3e6', 4: '#c5a9de', 5: '#f8e6b1', 6: '#a2e0c0', 7: '#f5b5b5', grid: '#e0e0f0', background: '#f0f0ff', hue: 340 },
-                mono: { 0: '#00000000', 1: '#ffffff', 2: '#e0e0e0', 3: '#c0c0c0', 4: '#a0a0a0', 5: '#808080', 6: '#606060', 7: '#404040', grid: '#202020', background: '#000000', hue: 0 }
+                neon: { 0: '#00000000', 1: '#00ffff', 2: '#ffff00', 3: '#ff00ff', 4: '#0000ff', 5: '#ff7f00', 6: '#00ff00', 7: '#ff0000', grid: '#1a1a3a', background: '#0a0a1a' },
+                cyberpunk: { 0: '#00000000', 1: '#f000ff', 2: '#00f0ff', 3: '#ff0055', 4: '#a000ff', 5: '#00ff90', 6: '#fff000', 7: '#0070ff', grid: '#200020', background: '#0a000a' },
+                retro: { 0: '#00000000', 1: '#e08040', 2: '#60e0a0', 3: '#d060c0', 4: '#e0c040', 5: '#5060e0', 6: '#c04040', 7: '#70e040', grid: '#303030', background: '#000000' },
+                pastel: { 0: '#00000000', 1: '#fd9ab2', 2: '#f0c05a', 3: '#a8d3e6', 4: '#c5a9de', 5: '#f8e6b1', 6: '#a2e0c0', 7: '#f5b5b5', grid: '#e0e0f0', background: '#f0f0ff' },
+                mono: { 0: '#00000000', 1: '#ffffff', 2: '#e0e0e0', 3: '#c0c0c0', 4: '#a0a0a0', 5: '#808080', 6: '#606060', 7: '#404040', grid: '#202020', background: '#000000' }
             };
             let currentTheme = THEMES.neon;
             const DIFFICULTIES = { easy: 1000, normal: 700, hard: 400, ultra: 200 };
             let baseDropInterval = DIFFICULTIES.normal;
             const SCORE_VALUES = { single: 100, double: 300, triple: 500, tetris: 800, tspin: 400, tspinSingle: 800, tspinDouble: 1200, tspinTriple: 1600, perfectClear: 3000, combo: 50, softDrop: 1, hardDrop: 2 };
             const LINES_PER_LEVEL = 10;
-            const LEADERBOARD_KEY = 'tetrisUltraLeaderboard';
+            
+            // New: Dreamlo URLs
+            // Fixed: Use a proxy to bypass mixed-content (http-from-https) errors.
+            const PROXY_URL = "https://api.allorigins.win/raw?url=";
+            const DREAMLO_PRIVATE_URL = "http://dreamlo.com/lb/srgh92_0dEeaf7Qj7DO6QQVLBfWgXzuUir6y2KByRwdA";
+            const DREAMLO_PUBLIC_URL = "http://dreamlo.com/lb/6914145b8f40bcaa5cd2bb6e/json";
+
             const ACHIEVEMENTS_KEY = 'tetrisUltraAchievements';
 
             // --- 3. GAME STATE & VARIABLES ---
-            // ... (Added idleTimer) ...
             let gameState = {
                 board: [], currentPiece: null, nextPiece: null, holdPiece: null, canSwapHold: true,
                 score: 0, lines: 0, level: 1, comboCounter: 0, isPaused: false, isGameOver: false,
                 isTurbo: false, lastMoveWasRotate: false, currentScreen: 'start', lastScreen: 'start',
                 lastTime: 0, dropCounter: 0, dropInterval: baseDropInterval, pieceTime: 0, pieceCount: 0,
                 skillFactor: 1.0, konamiIndex: 0, particles: [], lineClearParticles: [],
-                idleTimer: 0, // New
             };
             let achievements = {
-                // ... (unchanged) ...
-                'start': { name: 'Game On!', desc: 'Start your first game.', unlocked: false }, 'level5': { name: 'Getting Good', desc: 'Reach Level 5.', unlocked: false }, 'level10': { name: 'On Fire!', desc: 'Reach Level 10.', unlocked: false }, 'line10': { name: 'Line Clearer', desc: 'Clear 10 total lines.', unlocked: false }, 'tetris': { name: 'Tetris!', desc: 'Clear 4 lines at once.', unlocked: false }, 'tspin': { name: 'Twister', desc: 'Perform a T-Spin.', unlocked: false }, 'combo5': { name: 'Combo Master', desc: 'Get a 5x Combo.', unlocked: false }, 'perfect': { name: 'Perfection', desc: 'Achieve a Perfect Clear.', unlocked: false }, 'hold': { name: 'Saved For Later', desc: 'Use the Hold function.', unlocked: false }, 'ultra': { name: 'Going ULTRA', desc: 'Start a game on ULTRA difficulty.', unlocked: false },
+                'start': { name: 'Game On!', desc: 'Start your first game.', unlocked: false },
+                'level5': { name: 'Getting Good', desc: 'Reach Level 5.', unlocked: false },
+                'level10': { name: 'On Fire!', desc: 'Reach Level 10.', unlocked: false },
+                'line10': { name: 'Line Clearer', desc: 'Clear 10 total lines.', unlocked: false },
+                'tetris': { name: 'Tetris!', desc: 'Clear 4 lines at once.', unlocked: false },
+                'tspin': { name: 'Twister', desc: 'Perform a T-Spin.', unlocked: false },
+                'combo5': { name: 'Combo Master', desc: 'Get a 5x Combo.', unlocked: false },
+                'perfect': { name: 'Perfection', desc: 'Achieve a Perfect Clear.', unlocked: false },
+                'hold': { name: 'Saved For Later', desc: 'Use the Hold function.', unlocked: false },
+                'ultra': { name: 'Going ULTRA', desc: 'Start a game on ULTRA difficulty.', unlocked: false },
             };
             const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+            
+            // New: Mobile gesture state
+            let touchState = { startX: 0, startY: 0, moveX: 0, moveY: 0, isSwiping: false, lastMove: 0, lastTap: 0 };
+            const isMobile = 'ontouchstart' in window;
 
 
             // --- 4. UI MANAGER ---
-            // ... (Identical to v3.2, just formatted for brevity) ...
             class UIManager {
-                constructor() { this.currentScreen = 'start'; this.lastScreen = 'start'; this.activeScreenElement = screens.start; this.achievementQueue = []; }
+                constructor() {
+                    this.currentScreen = 'start';
+                    this.lastScreen = 'start';
+                    this.activeScreenElement = screens.start;
+                    this.achievementQueue = [];
+                }
+                
                 showScreen(screenName, skipFade = false) {
                     if (this.currentScreen === screenName && !skipFade) return;
-                    this.lastScreen = this.currentScreen; this.currentScreen = screenName;
-                    const newScreenElement = screens[screenName]; const fadeDuration = skipFade ? 0 : 300;
-                    if (this.activeScreenElement) { if (skipFade) this.activeScreenElement.classList.remove('active'); else this.activeScreenElement.classList.add('fade-out'); }
-                    if (screenName === 'game') { screens.game.classList.add('active'); } else if (screenName !== 'pause' && screenName !== 'gameOver') { screens.game.classList.remove('active'); }
+
+                    this.lastScreen = this.currentScreen;
+                    this.currentScreen = screenName;
+                    
+                    const newScreenElement = screens[screenName];
+                    const fadeDuration = skipFade ? 0 : 300;
+                    
+                    // Fade out old screen
+                    if (this.activeScreenElement) {
+                        if (skipFade) this.activeScreenElement.classList.remove('active');
+                        else this.activeScreenElement.classList.add('fade-out');
+                    }
+                    
+                    // Special handling for game screen (which is always "under" modals)
+                    if (screenName === 'game') {
+                        screens.game.classList.add('active'); // Show game screen
+                    } else if (screenName !== 'pause' && screenName !== 'gameOver') {
+                        // If moving to a menu (not pause), hide game screen
+                        screens.game.classList.remove('active');
+                    }
+
                     setTimeout(() => {
-                        if (this.activeScreenElement && !skipFade) { this.activeScreenElement.classList.remove('active'); this.activeScreenElement.classList.remove('fade-out'); }
-                        if (screenName !== 'game') { this.activeScreenElement = newScreenElement; if (this.activeScreenElement) { this.activeScreenElement.classList.add('active'); } } else { this.activeScreenElement = null; }
+                        // Hide old screen
+                        if (this.activeScreenElement && !skipFade) {
+                            this.activeScreenElement.classList.remove('active');
+                            this.activeScreenElement.classList.remove('fade-out');
+                        }
+                        
+                        // Show new screen (if it's not the game screen)
+                        if (screenName !== 'game') {
+                            this.activeScreenElement = newScreenElement;
+                            if (this.activeScreenElement) {
+                                this.activeScreenElement.classList.add('active');
+                            }
+                        } else {
+                            // If we're going *to* the game, there is no active "modal"
+                            this.activeScreenElement = null; 
+                        }
+                        
                         this.onScreenChange(screenName);
-                    }, fadeDuration);
+                        
+                    }, fadeDuration); // Must match CSS transition duration
                 }
+                
                 onScreenChange(screenName) {
                     switch(screenName) {
-                        case 'leaderboard': this.renderLeaderboard(); break;
+                        case 'leaderboard': 
+                            this.loadGlobalLeaderboard(); // Changed
+                            break;
                         case 'achievements': this.renderAchievements(); break;
                         case 'gameOver': ui.finalScore.textContent = `Final Score: ${gameState.score}`; ui.playerNameInput.value = ''; break;
                         case 'settings':
-                            settings.soundVolume.value = soundManager.getFXVolume();
-                            settings.musicVolume.value = soundManager.getMusicVolume();
+                            settings.sound.checked = soundManager.isSoundEnabled();
+                            settings.music.checked = soundManager.isMusicEnabled();
                             settings.difficulty.value = Object.keys(DIFFICULTIES).find(key => DIFFICULTIES[key] === baseDropInterval) || 'normal';
-                            settings.theme.value = Object.keys(THEMES).find(key => THEMES[key].hue === currentTheme.hue) || 'neon';
-                            settings.rain.checked = weather.isEnabled;
+                            settings.theme.value = Object.keys(THEMES).find(key => THEMES[key] === currentTheme) || 'neon';
                             break;
                     }
                 }
+
                 updateGameUI() {
                     ui.score.textContent = gameState.score;
                     ui.level.textContent = gameState.level;
@@ -734,58 +900,149 @@
                     if (gameState.comboCounter >= 3) { gameCanvas.classList.add('combo-active'); } 
                     else { gameCanvas.classList.remove('combo-active'); }
                 }
-                renderLeaderboard() { /* ... (unchanged) ... */ const scores = this.loadLeaderboard(); ui.leaderboardList.innerHTML = ''; if (scores.length === 0) { ui.leaderboardList.innerHTML = '<li>No scores yet!</li>'; return; } scores.forEach((entry, index) => { const li = document.createElement('li'); li.innerHTML = `<span class="rank">${index + 1}.</span><span class="name">${entry.name}</span><span class="score">${entry.score}</span>`; ui.leaderboardList.appendChild(li); }); }
-                loadLeaderboard() { try { const data = localStorage.getItem(LEADERBOARD_KEY); return data ? JSON.parse(data) : []; } catch (e) { console.error("Could not load leaderboard:", e); return []; } }
-                saveLeaderboard(name, score) { /* ... (unchanged) ... */ const scores = this.loadLeaderboard(); scores.push({ name, score }); scores.sort((a, b) => b.score - a.score); const topScores = scores.slice(0, 5); try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(topScores)); } catch (e) { console.error("Could not save leaderboard:", e); } }
+
+                // Modified to accept scores and add styling
+                renderLeaderboard(scores = []) {
+                    ui.leaderboardList.innerHTML = '';
+                    if (!scores || scores.length === 0) { 
+                        ui.leaderboardList.innerHTML = '<li><span class="name">No scores yet!</span></li>'; 
+                        return; 
+                    }
+                    scores.forEach((entry, index) => {
+                        const li = document.createElement('li');
+                        // New: Add top-3 class
+                        if (index < 3) {
+                            li.classList.add('top-3');
+                        }
+                        // Dreamlo provides 'name', 'score'
+                        li.innerHTML = `<span class="rank">${index + 1}.</span><span class="name">${entry.name}</span><span class="score">${entry.score}</span>`;
+                        ui.leaderboardList.appendChild(li);
+                    });
+                }
+
+                // New: Fetches from Dreamlo
+                loadGlobalLeaderboard() {
+                    ui.leaderboardList.innerHTML = '<li><span class="name">Loading...</span></li>';
+                    // Fixed: Use proxy for mixed-content
+                    const fetchUrl = PROXY_URL + encodeURIComponent(DREAMLO_PUBLIC_URL);
+                    fetch(fetchUrl, { mode: 'cors' })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            const scores = data?.dreamlo?.leaderboard?.entry || [];
+                            this.renderLeaderboard(scores);
+                        })
+                        .catch(error => {
+                            console.error("Error loading leaderboard:", error);
+                            ui.leaderboardList.innerHTML = '<li><span class="name">Error loading scores.</span></li>';
+                        });
+                }
+
+                // New: Submits to Dreamlo
+                submitGlobalScore(name, score) {
+                    const saneName = encodeURIComponent(name);
+                    // Fixed: Use proxy for mixed-content
+                    const submitUrl = `${DREAMLO_PRIVATE_URL}/add/${saneName}/${score}`;
+                    const fetchUrl = PROXY_URL + encodeURIComponent(submitUrl);
+                    
+                    // We don't wait for this, just send and forget
+                    fetch(fetchUrl, { mode: 'cors' })
+                        .then(response => {
+                            if (response.ok) {
+                                console.log("Score submitted successfully.");
+                            } else {
+                                console.warn("Score submission failed.", response);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error submitting score:", error);
+                        });
+                }
+
                 loadAchievements() { /* ... (unchanged) ... */ try { const data = localStorage.getItem(ACHIEVEMENTS_KEY); if (data) { const saved = JSON.parse(data); for (const key in achievements) { if (saved[key]) { achievements[key].unlocked = saved[key].unlocked; } } } } catch (e) { console.error("Could not load achievements:", e); } }
                 saveAchievements() { /* ... (unchanged) ... */ try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(achievements)); } catch (e) { console.error("Could not save achievements:", e); } }
+                
                 unlockAchievement(id) {
                     if (achievements[id] && !achievements[id].unlocked) {
                         achievements[id].unlocked = true; this.saveAchievements(); this.achievementQueue.push(id);
                         if (!ui.achievementPopup.classList.contains('show')) { this.showNextAchievement(); }
-                        soundManager.play('achievement'); // New
                     }
                 }
-                showNextAchievement() { /* ... (unchanged) ... */ if (this.achievementQueue.length === 0) return; const id = this.achievementQueue.shift(); const ach = achievements[id]; ui.achievementTitle.textContent = ach.name; ui.achievementDesc.textContent = ach.desc; ui.achievementPopup.classList.add('show'); setTimeout(() => { ui.achievementPopup.classList.remove('show'); setTimeout(() => this.showNextAchievement(), 500); }, 5000); }
-                renderAchievements() { /* ... (unchanged) ... */ ui.achievementsList.innerHTML = ''; for (const id in achievements) { const ach = achievements[id]; const li = document.createElement('li'); li.className = 'achievement-item'; if (ach.unlocked) li.classList.add('unlocked'); li.innerHTML = `<span class="name">${ach.name}</span><span class="desc">${ach.desc}</span><span class="status">${ach.unlocked ? 'UNLOCKED' : 'LOCKED'}</span>`; ui.achievementsList.appendChild(li); } }
-                triggerScreenShake() { /* ... (unchanged) ... */ if (gameContainer.classList.contains('shake')) { gameContainer.classList.remove('shake'); void gameContainer.offsetWidth; } gameContainer.classList.add('shake'); setTimeout(() => { gameContainer.classList.remove('shake'); }, 400); }
+                showNextAchievement() {
+                    if (this.achievementQueue.length === 0) return;
+                    const id = this.achievementQueue.shift(); const ach = achievements[id];
+                    ui.achievementTitle.textContent = ach.name; ui.achievementDesc.textContent = ach.desc;
+                    ui.achievementPopup.classList.add('show');
+                    setTimeout(() => { ui.achievementPopup.classList.remove('show'); setTimeout(() => this.showNextAchievement(), 500); }, 5000);
+                }
+                renderAchievements() {
+                    ui.achievementsList.innerHTML = '';
+                    for (const id in achievements) {
+                        const ach = achievements[id]; const li = document.createElement('li'); li.className = 'achievement-item';
+                        if (ach.unlocked) li.classList.add('unlocked');
+                        li.innerHTML = `<span class="name">${ach.name}</span><span class="desc">${ach.desc}</span><span class="status">${ach.unlocked ? 'UNLOCKED' : 'LOCKED'}</span>`;
+                        ui.achievementsList.appendChild(li);
+                    }
+                }
+                triggerScreenShake() {
+                    if (gameContainer.classList.contains('shake')) { gameContainer.classList.remove('shake'); void gameContainer.offsetWidth; }
+                    gameContainer.classList.add('shake');
+                    setTimeout(() => { gameContainer.classList.remove('shake'); }, 400);
+                }
             }
             const uiManager = new UIManager();
             
-            // ... (Stylesheet injection for achievements unchanged) ...
-            const styleSheet = document.createElement("style"); styleSheet.type = "text/css"; styleSheet.innerText = `#achievements-list { list-style: none; width: 100%; display: flex; flex-direction: column; gap: 1rem; } .achievement-item { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 1rem; background: rgba(255, 0, 0, 0.1); border-radius: var(--border-radius-s); border: 1px solid rgba(255, 0, 0, 0.2); } .achievement-item .name { font-size: 1.2rem; color: var(--text-dim); width: 100%; } .achievement-item .desc { font-size: 0.9rem; color: var(--text-dim); opacity: 0.7; } .achievement-item .status { font-size: 1rem; font-weight: 700; color: #f00; } .achievement-item.unlocked { background: rgba(0, 255, 255, 0.1); border-color: rgba(0, 255, 255, 0.2); } .achievement-item.unlocked .name { color: var(--color-primary); } .achievement-item.unlocked .desc { color: var(--color-primary); } .achievement-item.unlocked .status { color: var(--color-tertiary); }`;
+            // Inject Achievement CSS
+            const styleSheet = document.createElement("style"); styleSheet.type = "text/css";
+            styleSheet.innerText = `#achievements-list { list-style: none; width: 100%; display: flex; flex-direction: column; gap: 1rem; max-height: 40vh; overflow-y: auto; } .achievement-item { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 1rem; background: rgba(255, 0, 0, 0.1); border-radius: var(--border-radius-s); border: 1px solid rgba(255, 0, 0, 0.2); } .achievement-item .name { font-size: 1.2rem; color: var(--text-dim); width: 100%; } .achievement-item .desc { font-size: 0.9rem; color: var(--text-dim); opacity: 0.7; } .achievement-item .status { font-size: 1rem; font-weight: 700; color: #f00; } .achievement-item.unlocked { background: rgba(0, 255, 255, 0.1); border-color: rgba(0, 255, 255, 0.2); } .achievement-item.unlocked .name { color: var(--color-primary); } .achievement-item.unlocked .desc { color: var(--color-primary); } .achievement-item.unlocked .status { color: var(--color-tertiary); }`;
             document.head.appendChild(styleSheet);
 
 
-            // --- 5. SOUND MANAGER (v4.0 - DRAMATIC) ---
-            // ==========================================
-            
+            // --- 5. SOUND MANAGER (v3.3) ---
             class SoundManager {
                 constructor() {
                     this.audioCtx = null;
-                    this.soundEnabled = true; // This is now just a flag, volume is king
+                    this.soundEnabled = true;
                     this.musicEnabled = true;
+                    // Gain Nodes
                     this.masterSoundGain = null;
                     this.masterMusicGain = null;
                     this.kickGain = null; this.snareGain = null; this.hatGain = null;
-                    this.bassGain = null; this.ambientGain = null; this.arpGain = null; // New: Arp
-                    this.panner = null;
-                    this.musicMuffleFilter = null; // New: Muffle
-                    this.echoDelay = null; // New: Echo
-                    this.echoGain = null; // New: Echo
+                    this.bassGain = null; this.ambientGain = null;
+                    
+                    this.panner = null; // Piece FX panner
+                    // New: Panners for music
+                    this.ambientPanner = null; 
+                    this.bassPanner = null;
+                    
                     this.speech = window.speechSynthesis;
                     this.voice = null;
+                    
+                    // Music Engine
                     this.beatInterval = null;
                     this.currentBeat = 0;
-                    this.tempo = 120;
+                    this.tempo = 120; // bpm
                     this.bassOsc = null;
                     this.ambientOsc = null;
-                    this.arpOsc = null; // New: Arp
-                    this.currentFXVolume = 0.5;
-                    this.currentMusicVolume = 0.15;
+                    
                     this.loadVoice();
                 }
-                loadVoice() { /* ... (unchanged) ... */ }
+                
+                loadVoice() {
+                    if (!this.speech) return;
+                    const getVoices = () => {
+                        const voices = this.speech.getVoices();
+                        this.voice = voices.find(v => v.name.includes('Google') || v.name.includes('Microsoft') || v.lang.startsWith('en')) || voices[0];
+                    };
+                    getVoices();
+                    if (this.speech.onvoiceschanged !== undefined) {
+                        this.speech.onvoiceschanged = getVoices;
+                    }
+                }
                 
                 init() {
                     if (this.audioCtx) return;
@@ -795,93 +1052,70 @@
                         
                         // --- Sound FX Chain ---
                         this.masterSoundGain = this.audioCtx.createGain();
-                        this.masterSoundGain.gain.setValueAtTime(this.currentFXVolume, now);
-                        this.masterSoundGain.connect(this.audioCtx.destination);
+                        this.masterSoundGain.gain.setValueAtTime(this.soundEnabled ? 0.5 : 0, now);
                         
                         this.panner = this.audioCtx.createStereoPanner();
                         this.panner.pan.setValueAtTime(0, now);
-                        this.panner.connect(this.masterSoundGain);
                         
-                        // New: Echo/Reverb Chain
-                        this.echoDelay = this.audioCtx.createDelay(0.5);
-                        this.echoGain = this.audioCtx.createGain();
-                        this.echoDelay.connect(this.echoGain);
-                        this.echoGain.connect(this.echoDelay); // Feedback
-                        this.echoGain.connect(this.masterSoundGain); // Output
-                        this.echoDelay.delayTime.setValueAtTime(0.2, now); // 200ms delay
-                        this.echoGain.gain.setValueAtTime(0.4, now); // 40% feedback
+                        this.panner.connect(this.masterSoundGain);
+                        this.masterSoundGain.connect(this.audioCtx.destination);
                         
                         // --- Music Chain ---
                         this.masterMusicGain = this.audioCtx.createGain();
-                        this.masterMusicGain.gain.setValueAtTime(0, now); // Start silent
+                        this.masterMusicGain.gain.setValueAtTime(this.musicEnabled ? 0 : 0, now); // Start silent
+                        this.masterMusicGain.connect(this.audioCtx.destination);
                         
-                        // New: Muffle Filter
-                        this.musicMuffleFilter = this.audioCtx.createBiquadFilter();
-                        this.musicMuffleFilter.type = 'lowpass';
-                        this.musicMuffleFilter.frequency.setValueAtTime(22000, now); // Start wide open
-                        
-                        this.masterMusicGain.connect(this.musicMuffleFilter);
-                        this.musicMuffleFilter.connect(this.audioCtx.destination);
-                        
+                        // Create individual track gains
                         this.kickGain = this.audioCtx.createGain(); this.kickGain.connect(this.masterMusicGain);
                         this.snareGain = this.audioCtx.createGain(); this.snareGain.connect(this.masterMusicGain);
                         this.hatGain = this.audioCtx.createGain(); this.hatGain.connect(this.masterMusicGain);
-                        this.bassGain = this.audioCtx.createGain(); this.bassGain.connect(this.masterMusicGain);
-                        this.ambientGain = this.audioCtx.createGain(); this.ambientGain.connect(this.masterMusicGain);
-                        this.arpGain = this.audioCtx.createGain(); this.arpGain.connect(this.masterMusicGain); // New
+                        
+                        // New: Panner for bass
+                        this.bassPanner = this.audioCtx.createStereoPanner(); this.bassPanner.pan.setValueAtTime(-0.5, now); // Bass slightly left
+                        this.bassGain = this.audioCtx.createGain(); 
+                        this.bassGain.connect(this.bassPanner); this.bassPanner.connect(this.masterMusicGain);
+
+                        // New: Panner for ambient
+                        this.ambientPanner = this.audioCtx.createStereoPanner(); this.ambientPanner.pan.setValueAtTime(0.5, now); // Ambient slightly right
+                        this.ambientGain = this.audioCtx.createGain(); 
+                        this.ambientGain.connect(this.ambientPanner); this.ambientPanner.connect(this.masterMusicGain);
                         
                         this.kickGain.gain.value = 0.8;
                         this.snareGain.gain.value = 0.6;
                         this.hatGain.gain.value = 0.2;
                         this.bassGain.gain.value = 0.5;
-                        this.ambientGain.gain.value = 0.3; // More present pad
-                        this.arpGain.gain.value = 0.2; // New
+                        this.ambientGain.gain.value = 0.1;
                         
                         this.startAmbientDrone();
                         
-                    } catch(e) { console.error("Web Audio API not supported", e); this.soundEnabled = false; this.musicEnabled = false; }
+                    } catch(e) { console.error("Web Audio API is not supported", e); this.soundEnabled = false; this.musicEnabled = false; }
                 }
                 
-                // New: Volume Sliders
-                setFXVolume(vol) {
-                    this.currentFXVolume = parseFloat(vol);
-                    this.soundEnabled = this.currentFXVolume > 0;
-                    if (this.masterSoundGain) { this.masterSoundGain.gain.linearRampToValueAtTime(this.currentFXVolume, this.audioCtx.currentTime + 0.1); }
+                toggleSound(isEnabled) {
+                    this.soundEnabled = isEnabled;
+                    if (this.masterSoundGain) { this.masterSoundGain.gain.linearRampToValueAtTime(this.soundEnabled ? 0.5 : 0, this.audioCtx.currentTime + 0.1); }
                 }
-                setMusicVolume(vol) {
-                    this.currentMusicVolume = parseFloat(vol);
-                    this.musicEnabled = this.currentMusicVolume > 0;
-                    if (this.masterMusicGain) { this.masterMusicGain.gain.linearRampToValueAtTime(this.currentMusicVolume, this.audioCtx.currentTime + 0.1); }
-                    if (this.musicEnabled && !this.beatInterval) { this.startMusic(); }
+                toggleMusic(isEnabled) {
+                    this.musicEnabled = isEnabled;
+                    if (this.masterMusicGain) { this.masterMusicGain.gain.linearRampToValueAtTime(this.musicEnabled ? 0.15 : 0, this.audioCtx.currentTime + 0.5); }
+                    if (isEnabled && !this.beatInterval) { this.startMusic(); }
                 }
-                getFXVolume() { return this.currentFXVolume; }
-                getMusicVolume() { return this.currentMusicVolume; }
-
                 pauseMusic() {
-                    if (!this.masterMusicGain || !this.musicEnabled) return;
-                    const now = this.audioCtx.currentTime;
-                    // Muffle first
-                    this.musicMuffleFilter.frequency.linearRampToValueAtTime(300, now + 0.2);
-                    // Then fade out
-                    this.masterMusicGain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    if (this.masterMusicGain && this.musicEnabled) { this.masterMusicGain.gain.linearRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.5); }
                 }
                 resumeMusic() {
-                    if (!this.masterMusicGain || !this.musicEnabled) return;
-                    const now = this.audioCtx.currentTime;
-                    // Un-muffle
-                    this.musicMuffleFilter.frequency.linearRampToValueAtTime(22000, now + 0.3);
-                    // Fade in
-                    this.masterMusicGain.gain.linearRampToValueAtTime(this.currentMusicVolume, now + 0.5);
+                    if (this.masterMusicGain && this.musicEnabled) { this.masterMusicGain.gain.linearRampToValueAtTime(0.15, this.audioCtx.currentTime + 0.5); }
                 }
                 
+                // Reactive Silence
                 duckMusic(duration = 500) {
                     if (!this.masterMusicGain || !this.musicEnabled) return;
                     const now = this.audioCtx.currentTime;
-                    const originalVolume = this.currentMusicVolume;
+                    const originalVolume = 0.15;
                     this.masterMusicGain.gain.cancelScheduledValues(now);
-                    this.masterMusicGain.gain.setValueAtTime(originalVolume, now);
-                    this.masterMusicGain.gain.linearRampToValueAtTime(0.01, now + 0.05);
-                    this.masterMusicGain.gain.linearRampToValueAtTime(originalVolume, now + (duration / 1000));
+                    this.masterMusicGain.gain.setValueAtTime(this.masterMusicGain.gain.value, now);
+                    this.masterMusicGain.gain.linearRampToValueAtTime(0.01, now + 0.05); // Duck quickly
+                    this.masterMusicGain.gain.linearRampToValueAtTime(originalVolume, now + (duration / 1000)); // Return slowly
                 }
                 
                 isSoundEnabled() { return this.soundEnabled; }
@@ -890,12 +1124,11 @@
                 play(soundName) {
                     if (!this.soundEnabled || !this.audioCtx) return;
                     const now = this.audioCtx.currentTime;
-                    let osc, gain, source;
-                    
-                    gain = this.audioCtx.createGain();
-                    gain.connect(this.panner); // All sounds go to panner
-                    
+                    let osc, gain;
                     try {
+                        gain = this.audioCtx.createGain();
+                        gain.connect(this.panner); // Connect to 3D panner
+                        
                         switch(soundName) {
                             case 'rotate':
                                 osc = this.audioCtx.createOscillator(); osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now);
@@ -915,33 +1148,47 @@
                             case 'tetris': 
                                 osc = this.audioCtx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(1000, now); osc.frequency.exponentialRampToValueAtTime(1500, now + 0.4);
                                 gain.gain.setValueAtTime(0.5, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-                                osc.connect(gain);
-                                gain.connect(this.echoDelay); // New: Add echo
-                                osc.start(now); osc.stop(now + 0.4);
+                                osc.connect(gain); osc.start(now); osc.stop(now + 0.4);
                                 break;
                             case 'gameOver':
                                 osc = this.audioCtx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.8);
                                 gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
                                 osc.connect(gain); osc.start(now); osc.stop(now + 0.8);
                                 break;
-                            case 'achievement': // New
-                                osc = this.audioCtx.createOscillator(); osc.type = 'triangle';
-                                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-                                osc.frequency.setValueAtTime(1000, now); osc.frequency.linearRampToValueAtTime(1600, now + 0.1);
-                                osc.frequency.linearRampToValueAtTime(1200, now + 0.5);
-                                osc.connect(gain); osc.start(now); osc.stop(now + 0.5);
-                                break;
                         }
                     } catch (e) { console.error("Error playing sound:", e); }
                 }
+                
+                // Update piece panner
                 updatePan(xPosition) {
                     if (!this.panner) return;
-                    const pan = (xPosition / (COLS - 1)) * 1.6 - 0.8;
+                    const pan = (xPosition / (COLS - 1)) * 1.6 - 0.8; // Map 0-9 to -0.8 to 0.8
                     this.panner.pan.linearRampToValueAtTime(pan, this.audioCtx.currentTime + 0.05);
                 }
-                playVoice(text) { /* ... (unchanged) ... */ }
                 
-                // New: Dramatic Music Engine
+                // New: Update music panners based on camera
+                updateMusicPan(cameraYPan) {
+                    if (!this.bassPanner || !this.ambientPanner) return;
+                    // Move bass/ambient in opposite directions to camera
+                    this.bassPanner.pan.linearRampToValueAtTime(-0.5 - cameraYPan * 0.5, this.audioCtx.currentTime + 0.1);
+                    this.ambientPanner.pan.linearRampToValueAtTime(0.5 - cameraYPan * 0.5, this.audioCtx.currentTime + 0.1);
+                }
+                
+                playVoice(text) {
+                    if (!this.soundEnabled || !this.speech) return;
+                    try {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        if (this.voice) { utterance.voice = this.voice; }
+                        utterance.pitch = 1.1;
+                        utterance.rate = 1.2;
+                        this.speech.speak(utterance);
+                    } catch (e) {
+                        console.error("Speech synthesis failed", e);
+                    }
+                }
+                
+                // --- Procedural Music Engine ---
+                
                 startAmbientDrone() {
                     if (!this.audioCtx) return;
                     const now = this.audioCtx.currentTime;
@@ -949,25 +1196,17 @@
                     const lfo = this.audioCtx.createOscillator();
                     const lfoGain = this.audioCtx.createGain();
                     
-                    this.ambientOsc.type = 'sawtooth'; // Warmer pad
-                    this.ambientOsc.frequency.setValueAtTime(55, now); // Low A
-                    
-                    // Filter to make it a pad
-                    const padFilter = this.audioCtx.createBiquadFilter();
-                    padFilter.type = 'lowpass';
-                    padFilter.frequency.setValueAtTime(400, now);
-                    
+                    this.ambientOsc.type = 'sine'; this.ambientOsc.frequency.setValueAtTime(55, now); // Low A
                     lfo.type = 'sine'; lfo.frequency.setValueAtTime(0.1, now); // Very slow
-                    lfoGain.gain.setValueAtTime(100, now); // Modulate filter
+                    lfoGain.gain.setValueAtTime(0.01, now); // Subtle modulation
                     
                     lfo.connect(lfoGain);
-                    lfoGain.connect(padFilter.frequency);
+                    lfoGain.connect(this.ambientGain.gain);
                     
-                    this.ambientOsc.connect(padFilter);
-                    padFilter.connect(this.ambientGain);
-                    this.ambientOsc.start(now);
-                    lfo.start(now);
+                    this.ambientOsc.connect(this.ambientGain);
+                    this.ambientOsc.start(now); lfo.start(now);
                 }
+                
                 startMusic() {
                     if (!this.audioCtx || this.beatInterval) return;
                     const now = this.audioCtx.currentTime;
@@ -977,25 +1216,26 @@
                     this.bassOsc.connect(this.bassGain);
                     this.bassOsc.start(now);
                     
-                    this.arpOsc = this.audioCtx.createOscillator();
-                    this.arpOsc.type = 'triangle';
-                    this.arpOsc.connect(this.arpGain);
-                    this.arpOsc.start(now);
-                    
                     this.beatInterval = setInterval(() => {
                         const level = gameState.level;
                         if (this.musicEnabled) { this.playMusicBeat(level); }
                         this.currentBeat = (this.currentBeat + 1) % 16;
-                    }, 60000 / this.tempo / 4); // 16th notes
+                        
+                        // Trigger beat pulse
+                        document.body.classList.add('beat-active');
+                        setTimeout(() => document.body.classList.remove('beat-active'), 50);
+                        
+                    }, 60000 / this.tempo / 2); // 16th notes
                 }
+                
                 stopMusic() {
                     if (this.beatInterval) { clearInterval(this.beatInterval); this.beatInterval = null; }
                     if (this.bassOsc) { this.bassOsc.stop(); this.bassOsc = null; }
-                    if (this.arpOsc) { this.arpOsc.stop(); this.arpOsc = null; }
                 }
+                
                 updateMusic(level) {
-                    this.tempo = 120 + (level * 5); // Speed up
-                    if (this.beatInterval) {
+                    this.tempo = 120 + (level * 4);
+                    if (this.beatInterval) { // Restart interval with new tempo
                         this.stopMusic();
                         this.startMusic();
                     }
@@ -1003,89 +1243,178 @@
                 
                 playMusicBeat(level) {
                     const now = this.audioCtx.currentTime;
-                    const beat_16 = this.currentBeat;
-                    const beat_8 = Math.floor(this.currentBeat / 2);
-                    const beat_4 = Math.floor(this.currentBeat / 4);
                     
-                    // C Minor Scale: C, D, D#, F, G, G#, A#
-                    const scale = [261.63, 293.66, 311.13, 349.23, 392.00, 415.30, 466.16];
-                    const bassNotes = [scale[0]/4, scale[3]/4, scale[5]/4, scale[4]/4]; // C-F-G#-G
-                    const arpNotes = [scale[0], scale[2], scale[3], scale[4]]; // C-D#-F-G
-                    
-                    // Bassline (every 4 beats)
-                    if (beat_16 % 4 === 0) {
-                        this.bassOsc.frequency.setValueAtTime(bassNotes[beat_4 % 4], now);
+                    // Bassline (simple 16-step)
+                    const bassPattern = [1,0,0,1, 0,1,0,0, 1,0,1,0, 1,0,1,0];
+                    if (bassPattern[this.currentBeat] === 1) {
+                        this.bassOsc.frequency.setValueAtTime(this.currentBeat % 4 === 0 ? 65 : 82, now); // C, E
                         this.bassGain.gain.setValueAtTime(0.5, now);
-                        this.bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                        this.bassGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
                     }
                     
-                    // Kick (on the 4)
-                    if (beat_16 % 4 === 0) { this.playDrum('kick', now, this.kickGain); }
-                    // Snare (on 2 and 4)
-                    if (beat_16 === 4 || beat_16 === 12) { this.playDrum('snare', now, this.snareGain); }
-                    // Hi-hat (every 8th)
-                    if (level > 2 && beat_16 % 2 === 0) { this.playDrum('hihat', now, this.hatGain); }
-
-                    // Arpeggiator (every 16th, gets faster)
-                    let arpSpeed = level > 5 ? 1 : 2; // Play 16ths or 8ths
-                    if (level > 2 && beat_16 % arpSpeed === 0) {
-                        this.arpOsc.frequency.setValueAtTime(arpNotes[beat_8 % 4], now);
-                        this.arpGain.gain.setValueAtTime(0.2, now);
-                        this.arpGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    // Kick
+                    if (this.currentBeat % 4 === 0) {
+                        this.playDrum('kick', now, this.kickGain);
+                    }
+                    // Snare
+                    if (this.currentBeat === 4 || this.currentBeat === 12) {
+                        this.playDrum('snare', now, this.snareGain);
+                    }
+                    // Hi-hat
+                    if (level > 2 && this.currentBeat % 2 === 0) {
+                        this.playDrum('hihat', now, this.hatGain);
+                    }
+                    // Open hi-hat
+                    if (level > 5 && this.currentBeat === 14) {
+                        this.playDrum('openhat', now, this.hatGain);
                     }
                 }
                 
-                playDrum(type, time, destination) { /* ... (unchanged) ... */ let osc, gain; osc = this.audioCtx.createOscillator(); gain = this.audioCtx.createGain(); osc.connect(gain); gain.connect(destination); switch(type) { case 'kick': osc.type = 'sine'; osc.frequency.setValueAtTime(120, time); osc.frequency.exponentialRampToValueAtTime(50, time + 0.1); gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1); break; case 'snare': osc.type = 'triangle'; osc.frequency.setValueAtTime(250, time); gain.gain.setValueAtTime(0.8, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1); const noise = this.audioCtx.createBufferSource(); const buffer = this.audioCtx.createBuffer(1, this.audioCtx.sampleRate * 0.1, this.audioCtx.sampleRate); const data = buffer.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; noise.buffer = buffer; noise.connect(gain); noise.start(time); noise.stop(time + 0.1); break; case 'hihat': osc.type = 'square'; osc.frequency.setValueAtTime(2000, time); gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.03); break; case 'openhat': osc.type = 'square'; osc.frequency.setValueAtTime(2000, time); gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2); break; } osc.start(time); osc.stop(time + 0.2); }
+                playDrum(type, time, destination) {
+                    let osc, gain;
+                    osc = this.audioCtx.createOscillator(); gain = this.audioCtx.createGain();
+                    osc.connect(gain); gain.connect(destination);
+                    
+                    switch(type) {
+                        case 'kick':
+                            osc.type = 'sine'; osc.frequency.setValueAtTime(120, time); osc.frequency.exponentialRampToValueAtTime(50, time + 0.1);
+                            gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                            break;
+                        case 'snare':
+                            osc.type = 'triangle'; osc.frequency.setValueAtTime(250, time);
+                            gain.gain.setValueAtTime(0.8, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+                            // Add noise
+                            const noise = this.audioCtx.createBufferSource();
+                            const buffer = this.audioCtx.createBuffer(1, this.audioCtx.sampleRate * 0.1, this.audioCtx.sampleRate);
+                            const data = buffer.getChannelData(0);
+                            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+                            noise.buffer = buffer; noise.connect(gain); noise.start(time); noise.stop(time + 0.1);
+                            break;
+                        case 'hihat':
+                            osc.type = 'square'; osc.frequency.setValueAtTime(2000, time);
+                            gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.03);
+                            break;
+                        case 'openhat':
+                            osc.type = 'square'; osc.frequency.setValueAtTime(2000, time);
+                            gain.gain.setValueAtTime(1, time); gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                            break;
+                    }
+                    osc.start(time); osc.stop(time + 0.2);
+                }
             }
             const soundManager = new SoundManager();
 
 
             // --- 6. CANVAS RENDERER ---
-            // ==========================
-            
             class Renderer {
                 constructor() { this.colors = currentTheme; }
                 
                 setTheme(themeName) {
                     this.colors = THEMES[themeName] || THEMES.neon;
                     currentTheme = this.colors;
+                    
+                    // Update CSS vars for theme
                     const root = document.documentElement;
-                    // New: Set base-hue
-                    root.style.setProperty('--base-hue', this.colors.hue || 200);
+                    root.style.setProperty('--color-primary', this.colors[1] || '#00ffff');
+                    root.style.setProperty('--color-secondary', this.colors[3] || '#ff00ff');
+                    root.style.setProperty('--color-tertiary', this.colors[2] || '#ffff00');
                     
                     if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
-                         this.draw(); this.drawNextPiece(); this.drawHoldPiece();
+                         this.draw();
+                         this.drawNextPiece();
+                         this.drawHoldPiece();
                     }
                 }
                 
-                // ... (drawBlock, grid, board, piece, ghost identical) ...
-                drawBlock(ctx, x, y, color, size, isGhost = false) { if (color === THEMES.neon[0]) return; const B = size; const X = x * B; const Y = y * B; ctx.save(); if (isGhost) { ctx.globalAlpha = 0.3; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(X + 1, Y + 1, B - 2, B - 2); } else { ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 15; ctx.fillRect(X, Y, B, B); const gradient = ctx.createLinearGradient(X, Y, X + B, Y + B); gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)'); gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.0)'); gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)'); ctx.fillStyle = gradient; ctx.fillRect(X, Y, B, B); ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)'; ctx.lineWidth = 1; ctx.strokeRect(X, Y, B, B); } ctx.restore(); }
-                drawGrid(ctx) { ctx.save(); ctx.strokeStyle = this.colors.grid; ctx.lineWidth = 1; for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * BLOCK_SIZE, 0); ctx.lineTo(x * BLOCK_SIZE, ROWS * BLOCK_SIZE); ctx.stroke(); } for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * BLOCK_SIZE); ctx.lineTo(COLS * BLOCK_SIZE, y * BLOCK_SIZE); ctx.stroke(); } ctx.restore(); }
-                drawBoard() { for (let y = 0; y < ROWS; y++) { for (let x = 0; x < COLS; x++) { const blockType = gameState.board[y][x]; if (blockType !== 0) { this.drawBlock(gameCtx, x, y, this.colors[blockType], BLOCK_SIZE); } } } }
-                drawPiece(piece) { const color = this.colors[piece.type]; piece.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(gameCtx, piece.x + x, piece.y + y, color, BLOCK_SIZE); } }); }); }
-                drawGhostPiece() { if (!gameState.currentPiece) return; const ghost = { ...gameState.currentPiece }; const color = this.colors[ghost.type]; while (game.isValidMove(ghost.shape, ghost.x, ghost.y + 1)) { ghost.y++; } ghost.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(gameCtx, ghost.x + x, ghost.y + y, color, BLOCK_SIZE, true); } }); }); }
+                drawBlock(ctx, x, y, color, size, isGhost = false) {
+                    if (color === THEMES.neon[0]) return; // Don't draw empty
+                    const B = size; const X = x * B; const Y = y * B;
+                    ctx.save();
+                    if (isGhost) {
+                        ctx.globalAlpha = 0.3; ctx.strokeStyle = color;
+                        ctx.lineWidth = 2; ctx.strokeRect(X + 1, Y + 1, B - 2, B - 2);
+                    } else {
+                        // Main block
+                        ctx.fillStyle = color;
+                        ctx.shadowColor = color; ctx.shadowBlur = 15;
+                        ctx.fillRect(X, Y, B, B);
+                        
+                        // Inner gradient
+                        const gradient = ctx.createLinearGradient(X, Y, X + B, Y + B);
+                        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+                        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.0)');
+                        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(X, Y, B, B);
+
+                        // Subtle border
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(X, Y, B, B);
+                    }
+                    ctx.restore();
+                }
+
+                drawGrid(ctx) {
+                    ctx.save(); ctx.strokeStyle = this.colors.grid; ctx.lineWidth = 1;
+                    for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * BLOCK_SIZE, 0); ctx.lineTo(x * BLOCK_SIZE, ROWS * BLOCK_SIZE); ctx.stroke(); }
+                    for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * BLOCK_SIZE); ctx.lineTo(COLS * BLOCK_SIZE, y * BLOCK_SIZE); ctx.stroke(); }
+                    ctx.restore();
+                }
+
+                drawBoard() {
+                    for (let y = 0; y < ROWS; y++) { for (let x = 0; x < COLS; x++) { const blockType = gameState.board[y][x]; if (blockType !== 0) { this.drawBlock(gameCtx, x, y, this.colors[blockType], BLOCK_SIZE); } } }
+                }
+
+                drawPiece(piece) {
+                    const color = this.colors[piece.type];
+                    piece.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(gameCtx, piece.x + x, piece.y + y, color, BLOCK_SIZE); } }); });
+                }
+
+                drawGhostPiece() {
+                    if (!gameState.currentPiece) return;
+                    const ghost = { ...gameState.currentPiece }; const color = this.colors[ghost.type];
+                    // Move ghost down
+                    while (game.isValidMove(ghost.shape, ghost.x, ghost.y + 1)) { ghost.y++; }
+                    // Draw ghost
+                    ghost.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(gameCtx, ghost.x + x, ghost.y + y, color, BLOCK_SIZE, true); } }); });
+                }
                 
-                // ... (drawNext, drawHold, drawInfo identical) ...
                 drawNextPiece() { this.drawInfoPiece(nextCtx, gameState.nextPiece, NEXT_CANVAS_SIZE); }
                 drawHoldPiece() { this.drawInfoPiece(holdCtx, gameState.holdPiece, HOLD_CANVAS_SIZE, !gameState.canSwapHold); }
-                drawInfoPiece(ctx, piece, canvasSize, isDisabled = false) { ctx.clearRect(0, 0, canvasSize, canvasSize); if (!piece) return; const color = this.colors[piece.type]; const B = canvasSize / 4; const shape = piece.shape; const w = shape[0].length; const h = shape.length; const offsetX = (4 - w) / 2; const offsetY = (4 - h) / 2; if (isDisabled) ctx.globalAlpha = 0.3; shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(ctx, offsetX + x, offsetY + y, color, B); } }); }); ctx.globalAlpha = 1.0; }
+
+                drawInfoPiece(ctx, piece, canvasSize, isDisabled = false) {
+                    ctx.clearRect(0, 0, canvasSize, canvasSize); if (!piece) return;
+                    const color = this.colors[piece.type]; const B = canvasSize / 4; // 4x4 grid
+                    const shape = piece.shape;
+                    const w = shape[0].length; const h = shape.length;
+                    const offsetX = (4 - w) / 2; const offsetY = (4 - h) / 2;
+                    if (isDisabled) ctx.globalAlpha = 0.3;
+                    shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { this.drawBlock(ctx, offsetX + x, offsetY + y, color, B); } }); });
+                    ctx.globalAlpha = 1.0;
+                }
 
                 draw() {
                     gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
                     gameCtx.shadowColor = 'transparent'; gameCtx.shadowBlur = 0;
-                    this.drawGrid(gameCtx); this.drawBoard();
-                    if (gameState.currentPiece) { this.drawGhostPiece(); this.drawPiece(gameState.currentPiece); }
-                    this.drawParticles(gameCtx, gameState.lineClearParticles);
-                    this.drawParticles(gameCtx, gameState.particles);
+                    this.drawGrid(gameCtx);
+                    this.drawBoard();
+                    if (gameState.currentPiece) {
+                        this.drawGhostPiece();
+                        this.drawPiece(gameState.currentPiece);
+                    }
+                    this.drawParticles(gameCtx, gameState.lineClearParticles); // Draw line clears
+                    this.drawParticles(gameCtx, gameState.particles); // Draw trails
                 }
                 
-                // New: Amplified particles
+                // Amplified particles
                 createLineClearParticles(y, lines, isTetrisOrTSpin) {
                     const particleCount = lines * (isTetrisOrTSpin ? 200 : 30); // More particles
                     const color = isTetrisOrTSpin ? '255, 255, 0' : '255, 255, 255';
                     for (let i = 0; i < particleCount; i++) {
                         gameState.lineClearParticles.push({
-                            x: Math.random() * gameCanvas.width, y: (y + Math.random()) * BLOCK_SIZE,
+                            x: Math.random() * gameCanvas.width,
+                            y: (y + Math.random()) * BLOCK_SIZE,
                             vx: (Math.random() - 0.5) * (isTetrisOrTSpin ? 15 : 5), // More velocity
                             vy: (Math.random() - 0.5) * (isTetrisOrTSpin ? 15 : 5), // More velocity
                             life: isTetrisOrTSpin ? 100 : 50, // Longer life
@@ -1094,230 +1423,486 @@
                     }
                 }
                 
-                // ... (createPieceTrail, updateParticles, drawParticles identical) ...
-                createPieceTrail() { if (!gameState.currentPiece) return; const piece = gameState.currentPiece; const color = this.colors[piece.type]; piece.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { gameState.particles.push({ x: (piece.x + x + Math.random()) * BLOCK_SIZE, y: (piece.y + y + Math.random()) * BLOCK_SIZE, vx: (Math.random() - 0.5) * 1, vy: (Math.random() - 0.5) * 1 - 0.5, life: 20, color: color }); } }); }); }
-                updateParticles(particleArray) { for (let i = particleArray.length - 1; i >= 0; i--) { const p = particleArray[i]; p.x += p.vx; p.y += p.vy; p.life--; if (p.life <= 0) { particleArray.splice(i, 1); } } }
-                drawParticles(ctx, particleArray) { ctx.save(); particleArray.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 50; ctx.shadowColor = p.color; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(p.x, p.y, Math.random() * 2 + 1, 0, Math.PI * 2); ctx.fill(); }); ctx.restore(); }
+                createPieceTrail() {
+                    if (!gameState.currentPiece) return;
+                    const piece = gameState.currentPiece; const color = this.colors[piece.type];
+                    piece.shape.forEach((row, y) => { row.forEach((value, x) => {
+                        if (value !== 0) { gameState.particles.push({
+                            x: (piece.x + x + Math.random()) * BLOCK_SIZE,
+                            y: (piece.y + y + Math.random()) * BLOCK_SIZE,
+                            vx: (Math.random() - 0.5) * 1,
+                            vy: (Math.random() - 0.5) * 1 - 0.5,
+                            life: 20, color: color
+                        }); }
+                    }); });
+                }
+
+                updateParticles(particleArray) {
+                    for (let i = particleArray.length - 1; i >= 0; i--) {
+                        const p = particleArray[i];
+                        p.x += p.vx; p.y += p.vy; p.life--;
+                        if (p.life <= 0) { particleArray.splice(i, 1); }
+                    }
+                }
+
+                drawParticles(ctx, particleArray) {
+                    ctx.save();
+                    particleArray.forEach(p => {
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = p.life / 50; // Fade out
+                        ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, Math.random() * 2 + 1, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                    ctx.restore();
+                }
             }
             const renderer = new Renderer();
-            
-            
-            // --- 7. NEW: WEATHER ENGINE ---
-            // ============================
-            class Weather {
+
+
+            // --- 7. GAME LOGIC (v4.0) ---
+            class Game {
                 constructor() {
-                    this.drops = [];
-                    this.isEnabled = true;
+                    this.gameLoop = this.gameLoop.bind(this);
                     this.animationFrameId = null;
                 }
-                
-                init() {
-                    for (let i = 0; i < 100; i++) {
-                        this.drops.push({
-                            x: Math.random() * weatherCanvas.width,
-                            y: Math.random() * weatherCanvas.height,
-                            l: Math.random() * 1.5 + 0.5,
-                            vy: Math.random() * 2 + 3
-                        });
-                    }
-                }
-                
-                draw() {
-                    if (!this.isEnabled) {
-                        weatherCtx.clearRect(0, 0, weatherCanvas.width, weatherCanvas.height);
-                        return;
-                    }
-                    weatherCtx.clearRect(0, 0, weatherCanvas.width, weatherCanvas.height);
-                    weatherCtx.strokeStyle = 'var(--color-primary)';
-                    weatherCtx.lineWidth = 1;
-                    
-                    this.drops.forEach(d => {
-                        weatherCtx.beginPath();
-                        weatherCtx.moveTo(d.x, d.y);
-                        weatherCtx.lineTo(d.x, d.y + d.l);
-                        weatherCtx.stroke();
-                        
-                        d.y += d.vy;
-                        if (d.y > weatherCanvas.height) {
-                            d.y = 0 - d.l;
-                            d.x = Math.random() * weatherCanvas.width;
-                        }
-                    });
-                }
-                
-                loop() {
-                    this.draw();
-                    this.animationFrameId = requestAnimationFrame(() => this.loop());
-                }
-                
-                start() {
-                    this.isEnabled = true;
-                    if (!this.animationFrameId) this.loop();
-                }
-                
-                stop() {
-                    this.isEnabled = false;
-                }
-                
-                toggle(isEnabled) {
-                    this.isEnabled = isEnabled;
-                    if (this.isEnabled && !this.animationFrameId) this.start();
-                }
-            }
-            const weather = new Weather();
-
-
-            // --- 8. GAME LOGIC (v4.0) ---
-            // ============================
-            
-            class Game {
-                constructor() { this.gameLoop = this.gameLoop.bind(this); this.animationFrameId = null; }
                 createBoard() { return Array.from({ length: ROWS }, () => Array(COLS).fill(0)); }
-                createPiece(type) { const p = type ? PIECES.find(p => p.name === type) : PIECES[Math.floor(Math.random() * PIECES.length)]; const shape = p.shape; const typeIndex = PIECES.indexOf(p) + 1; return { shape: shape, type: typeIndex, name: p.name, x: Math.floor(COLS / 2) - Math.ceil(shape[0].length / 2), y: 0 }; }
-                spawnPiece() { gameState.currentPiece = gameState.nextPiece || this.createPiece(); gameState.nextPiece = this.createPiece(); renderer.drawNextPiece(); gameState.dropCounter = 0; gameState.canSwapHold = true; gameState.lastMoveWasRotate = false; gameState.pieceTime = performance.now(); gameState.pieceCount++; if (!this.isValidMove(gameState.currentPiece.shape, gameState.currentPiece.x, gameState.currentPiece.y)) { this.gameOver(); } }
-                rotatePiece(piece, direction) { const shape = piece.shape; const N = shape.length; const newShape = Array.from({ length: N }, () => Array(N).fill(0)); for (let y = 0; y < N; y++) { for (let x = 0; x < N; x++) { if (direction === 1) newShape[x][N - 1 - y] = shape[y][x]; else newShape[N - 1 - x][y] = shape[y][x]; } } return newShape; }
                 
+                createPiece(type) {
+                    const p = type ? PIECES.find(p => p.name === type) : PIECES[Math.floor(Math.random() * PIECES.length)];
+                    const shape = p.shape; const typeIndex = PIECES.indexOf(p) + 1;
+                    return {
+                        shape: shape, type: typeIndex, name: p.name,
+                        x: Math.floor(COLS / 2) - Math.ceil(shape[0].length / 2),
+                        y: 0
+                    };
+                }
+
+                spawnPiece() {
+                    gameState.currentPiece = gameState.nextPiece || this.createPiece();
+                    gameState.nextPiece = this.createPiece();
+                    renderer.drawNextPiece();
+                    gameState.dropCounter = 0;
+                    gameState.canSwapHold = true;
+                    gameState.lastMoveWasRotate = false;
+                    gameState.pieceTime = performance.now();
+                    gameState.pieceCount++;
+                    if (!this.isValidMove(gameState.currentPiece.shape, gameState.currentPiece.x, gameState.currentPiece.y)) {
+                        this.gameOver();
+                    }
+                }
+
+                rotatePiece(piece, direction) {
+                    const shape = piece.shape; const N = shape.length;
+                    const newShape = Array.from({ length: N }, () => Array(N).fill(0));
+                    for (let y = 0; y < N; y++) {
+                        for (let x = 0; x < N; x++) {
+                            if (direction === 1) newShape[x][N - 1 - y] = shape[y][x]; // Clockwise
+                            else newShape[N - 1 - x][y] = shape[y][x]; // Counter-clockwise
+                        }
+                    }
+                    return newShape;
+                }
+
                 handleRotate(direction) {
                     if (!gameState.currentPiece) return;
-                    this.resetIdleTimer();
                     const newShape = this.rotatePiece(gameState.currentPiece, direction);
                     let newX = gameState.currentPiece.x; let newY = gameState.currentPiece.y;
-                    if (!this.isValidMove(newShape, newX, newY)) { if (this.isValidMove(newShape, newX - 1, newY)) newX--; else if (this.isValidMove(newShape, newX + 1, newY)) newX++; else if (this.isValidMove(newShape, newX, newY - 1)) newY--; else return; }
-                    gameState.currentPiece.shape = newShape; gameState.currentPiece.x = newX; gameState.currentPiece.y = newY;
+
+                    // Wall kick logic
+                    if (!this.isValidMove(newShape, newX, newY)) {
+                        if (this.isValidMove(newShape, newX - 1, newY)) newX--; // Try left
+                        else if (this.isValidMove(newShape, newX + 1, newY)) newX++; // Try right
+                        else if (this.isValidMove(newShape, newX, newY - 1)) newY--; // Try up (for T-Spin)
+                        else return; // Can't rotate
+                    }
+                    
+                    gameState.currentPiece.shape = newShape;
+                    gameState.currentPiece.x = newX;
+                    gameState.currentPiece.y = newY;
                     gameState.lastMoveWasRotate = true;
                     soundManager.play('rotate');
                     soundManager.updatePan(gameState.currentPiece.x);
                 }
+                
                 handleMove(dx, dy) {
                     if (!gameState.currentPiece) return;
-                    this.resetIdleTimer();
                     const newX = gameState.currentPiece.x + dx; const newY = gameState.currentPiece.y + dy;
                     if (this.isValidMove(gameState.currentPiece.shape, newX, newY)) {
-                        gameState.currentPiece.x = newX; gameState.currentPiece.y = newY;
-                        if (dy > 0) { gameState.score += SCORE_VALUES.softDrop; gameState.dropCounter = 0; }
-                        gameState.lastMoveWasRotate = false;
-                        if (dx !== 0) {
-                            soundManager.updatePan(gameState.currentPiece.x);
-                            // New: Camera Tilt
-                            document.documentElement.style.setProperty('--camera-rotate-y', `${-3 + dx * -2}deg`);
-                            setTimeout(() => document.documentElement.style.setProperty('--camera-rotate-y', `-3deg`), 200);
+                        gameState.currentPiece.x = newX;
+                        gameState.currentPiece.y = newY;
+                        if (dy > 0) { // Soft drop
+                            gameState.score += SCORE_VALUES.softDrop;
+                            gameState.dropCounter = 0; // Reset timer on move
                         }
+                        gameState.lastMoveWasRotate = false;
+                        if (dx !== 0) soundManager.updatePan(gameState.currentPiece.x); // Update 3D pan
                         return true;
                     }
                     return false;
                 }
                 
+                // Hard Drop with Reactive Silence
                 hardDrop() {
                     if (!gameState.currentPiece) return;
-                    this.resetIdleTimer();
-                    let dropCount = 0; const ghost = { ...gameState.currentPiece };
-                    while (this.isValidMove(ghost.shape, ghost.x, ghost.y + 1)) { ghost.y++; dropCount++; }
+                    
+                    let dropCount = 0;
+                    const ghost = { ...gameState.currentPiece };
+                    while (this.isValidMove(ghost.shape, ghost.x, ghost.y + 1)) {
+                        ghost.y++;
+                        dropCount++;
+                    }
+                    
+                    // Check for reactive silence
                     const { lines, tspin } = this.predictClear(ghost);
-                    if (lines >= 4 || (tspin && lines > 0)) { soundManager.duckMusic(400); }
+                    if (lines >= 4 || (tspin && lines > 0)) {
+                        soundManager.duckMusic(400); // Duck for 400ms
+                    }
+                    
+                    // Now do the actual move
                     while (this.handleMove(0, 1)) { /* empty */ }
+                    
                     gameState.score += dropCount * SCORE_VALUES.hardDrop;
                     this.lockPiece();
                     soundManager.play('drop');
                 }
                 
-                predictClear(piece) { /* ... (unchanged) ... */ const testBoard = gameState.board.map(row => [...row]); piece.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { const boardX = piece.x + x; const boardY = piece.y + y; if (boardY >= 0 && boardX >= 0 && boardX < COLS && boardY < ROWS) { testBoard[boardY][boardX] = piece.type; } } }); }); let linesCleared = 0; for (let y = ROWS - 1; y >= 0; y--) { if (testBoard[y].every(cell => cell !== 0)) { linesCleared++; } } const tspin = (piece.name === 'T' && gameState.lastMoveWasRotate); return { lines: linesCleared, tspin: tspin }; }
-                handleHold() { /* ... (unchanged) ... */ if (!gameState.canSwapHold || !gameState.currentPiece) return; this.resetIdleTimer(); uiManager.unlockAchievement('hold'); const temp = gameState.currentPiece; if (gameState.holdPiece) { gameState.currentPiece = this.createPiece(gameState.holdPiece.name); } else { this.spawnPiece(); gameState.currentPiece = gameState.nextPiece; gameState.nextPiece = this.createPiece(); renderer.drawNextPiece(); } gameState.holdPiece = this.createPiece(temp.name); gameState.canSwapHold = false; renderer.drawHoldPiece(); }
-                isValidMove(shape, x, y) { /* ... (unchanged) ... */ for (let row = 0; row < shape.length; row++) { for (let col = 0; col < shape[row].length; col++) { if (shape[row][col] !== 0) { const newX = x + col; const newY = y + row; if (newX < 0 || newX >= COLS || newY >= ROWS) return false; if (newY >= 0 && gameState.board[newY][newX] !== 0) return false; } } } return true; }
-                lockPiece() { /* ... (unchanged) ... */ if (!gameState.currentPiece) return; const piece = gameState.currentPiece; let tspinType = this.checkTSpin(piece); this.updateAdaptiveDifficulty(); piece.shape.forEach((row, y) => { row.forEach((value, x) => { if (value !== 0) { const boardX = piece.x + x; const boardY = piece.y + y; if (boardY >= 0) { gameState.board[boardY][boardX] = piece.type; } } }); }); gameState.currentPiece = null; const linesCleared = this.clearLines(); const perfectClear = this.checkPerfectClear(); this.updateScore(linesCleared, tspinType, perfectClear); if (linesCleared > 0 || tspinType) { uiManager.triggerScreenShake(); } this.spawnPiece(); uiManager.updateGameUI(); }
-                checkTSpin(piece) { /* ... (unchanged) ... */ if (piece.name !== 'T' || !gameState.lastMoveWasRotate) { return 0; } const cx = piece.x + 1; const cy = piece.y + 1; const corners = [ this.isOccupied(cx - 1, cy - 1), this.isOccupied(cx + 1, cy - 1), this.isOccupied(cx - 1, cy + 1), this.isOccupied(cx + 1, cy + 1) ]; const occupiedCorners = corners.filter(c => c).length; if (occupiedCorners >= 3) { uiManager.unlockAchievement('tspin'); return 1; } return 0; }
-                isOccupied(x, y) { /* ... (unchanged) ... */ if (x < 0 || x >= COLS || y >= ROWS) return true; if (y < 0) return false; return gameState.board[y][x] !== 0; }
-                checkPerfectClear() { /* ... (unchanged) ... */ return gameState.board.every(row => row.every(cell => cell === 0)); }
-                clearLines() { /* ... (unchanged) ... */ let linesCleared = 0; let firstLineY = -1; for (let y = ROWS - 1; y >= 0; y--) { if (gameState.board[y].every(cell => cell !== 0)) { if (firstLineY === -1) firstLineY = y; linesCleared++; gameState.board.splice(y, 1); gameState.board.unshift(Array(COLS).fill(0)); y++; } } if (linesCleared > 0) { gameState.comboCounter++; const isSpecial = linesCleared === 4 || gameState.lastMoveWasRotate; renderer.createLineClearParticles(firstLineY, linesCleared, isSpecial); soundManager.play(linesCleared === 4 ? 'tetris' : 'clear'); } else { gameState.comboCounter = 0; } return linesCleared; }
-                
-                updateScore(linesCleared, tspinType, perfectClear) {
-                    // ... (scoring logic unchanged) ...
-                    let lineScore = 0; let voiceCall = null; if (perfectClear) { lineScore += SCORE_VALUES.perfectClear; voiceCall = "Perfect Clear!"; uiManager.unlockAchievement('perfect'); } if (tspinType > 0) { if (linesCleared === 1) lineScore += SCORE_VALUES.tspinSingle; else if (linesCleared === 2) lineScore += SCORE_VALUES.tspinDouble; else if (linesCleared === 3) lineScore += SCORE_VALUES.tspinTriple; else lineScore += SCORE_VALUES.tspin; voiceCall = "T-Spin"; } else { if (linesCleared === 1) lineScore = SCORE_VALUES.single; else if (linesCleared === 2) lineScore = SCORE_VALUES.double; else if (linesCleared === 3) lineScore = SCORE_VALUES.triple; else if (linesCleared >= 4) { lineScore = SCORE_VALUES.tetris; voiceCall = "Tetris!"; uiManager.unlockAchievement('tetris'); } } let comboBonus = (gameState.comboCounter > 1) ? (SCORE_VALUES.combo * gameState.comboCounter * gameState.level) : 0; if (comboBonus > 0 && !voiceCall) { voiceCall = `Combo ${gameState.comboCounter}`; } gameState.score += (lineScore + comboBonus) * gameState.level; gameState.lines += linesCleared; if (voiceCall) { soundManager.playVoice(voiceCall); }
+                // Helper for hardDrop silence check
+                predictClear(piece) {
+                    const testBoard = gameState.board.map(row => [...row]);
+                    piece.shape.forEach((row, y) => {
+                        row.forEach((value, x) => {
+                            if (value !== 0) {
+                                const boardX = piece.x + x;
+                                const boardY = piece.y + y;
+                                if (boardY >= 0 && boardX >= 0 && boardX < COLS && boardY < ROWS) {
+                                    testBoard[boardY][boardX] = piece.type;
+                                }
+                            }
+                        });
+                    });
                     
+                    let linesCleared = 0;
+                    for (let y = ROWS - 1; y >= 0; y--) {
+                        if (testBoard[y].every(cell => cell !== 0)) {
+                            linesCleared++;
+                        }
+                    }
+                    
+                    const tspin = (piece.name === 'T' && gameState.lastMoveWasRotate);
+                    
+                    return { lines: linesCleared, tspin: tspin };
+                }
+                
+                handleHold() {
+                    if (!gameState.canSwapHold || !gameState.currentPiece) return;
+                    uiManager.unlockAchievement('hold');
+                    const temp = gameState.currentPiece;
+                    if (gameState.holdPiece) {
+                        gameState.currentPiece = this.createPiece(gameState.holdPiece.name);
+                    } else {
+                        // First hold, need to spawn next piece
+                        this.spawnPiece(); // This will be recursive, but just once
+                        gameState.currentPiece = gameState.nextPiece;
+                        gameState.nextPiece = this.createPiece();
+                        renderer.drawNextPiece();
+                    }
+                    gameState.holdPiece = this.createPiece(temp.name); // Hold the piece
+                    gameState.canSwapHold = false;
+                    renderer.drawHoldPiece();
+                }
+
+                isValidMove(shape, x, y) {
+                    for (let row = 0; row < shape.length; row++) {
+                        for (let col = 0; col < shape[row].length; col++) {
+                            if (shape[row][col] !== 0) {
+                                const newX = x + col;
+                                const newY = y + row;
+                                // Check boundaries
+                                if (newX < 0 || newX >= COLS || newY >= ROWS) return false;
+                                // Check collision with board (only if inside board)
+                                if (newY >= 0 && gameState.board[newY][newX] !== 0) return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+
+                lockPiece() {
+                    if (!gameState.currentPiece) return;
+                    
+                    const piece = gameState.currentPiece;
+                    let tspinType = this.checkTSpin(piece);
+                    
+                    this.updateAdaptiveDifficulty(); // Check skill before locking
+                    
+                    piece.shape.forEach((row, y) => {
+                        row.forEach((value, x) => {
+                            if (value !== 0) {
+                                const boardX = piece.x + x;
+                                const boardY = piece.y + y;
+                                if (boardY >= 0) { // Don't lock pieces above the board
+                                    gameState.board[boardY][boardX] = piece.type;
+                                }
+                            }
+                        });
+                    });
+
+                    gameState.currentPiece = null; // Piece is locked
+                    
+                    const linesCleared = this.clearLines();
+                    const perfectClear = this.checkPerfectClear();
+                    
+                    this.updateScore(linesCleared, tspinType, perfectClear);
+                    
+                    if (linesCleared > 0 || tspinType) {
+                        uiManager.triggerScreenShake();
+                    }
+                    
+                    this.spawnPiece(); // Spawn new piece
+                    uiManager.updateGameUI();
+                }
+
+                checkTSpin(piece) {
+                    if (piece.name !== 'T' || !gameState.lastMoveWasRotate) { return 0; }
+                    
+                    // T-piece center
+                    const cx = piece.x + 1; const cy = piece.y + 1;
+                    
+                    // Check 4 corners
+                    const corners = [
+                        this.isOccupied(cx - 1, cy - 1), // Top-left
+                        this.isOccupied(cx + 1, cy - 1), // Top-right
+                        this.isOccupied(cx - 1, cy + 1), // Bottom-left
+                        this.isOccupied(cx + 1, cy + 1)  // Bottom-right
+                    ];
+                    
+                    const occupiedCorners = corners.filter(c => c).length;
+                    
+                    if (occupiedCorners >= 3) {
+                        uiManager.unlockAchievement('tspin');
+                        return 1; // T-Spin
+                    }
+                    return 0;
+                }
+
+                isOccupied(x, y) {
+                    if (x < 0 || x >= COLS || y >= ROWS) return true; // Outside is "occupied"
+                    if (y < 0) return false; // Above board is not occupied
+                    return gameState.board[y][x] !== 0;
+                }
+                
+                checkPerfectClear() {
+                    return gameState.board.every(row => row.every(cell => cell === 0));
+                }
+
+                clearLines() {
+                    let linesCleared = 0;
+                    let firstLineY = -1;
+                    
+                    for (let y = ROWS - 1; y >= 0; y--) {
+                        if (gameState.board[y].every(cell => cell !== 0)) {
+                            if (firstLineY === -1) firstLineY = y;
+                            linesCleared++;
+                            gameState.board.splice(y, 1); // Remove line
+                            gameState.board.unshift(Array(COLS).fill(0)); // Add empty line at top
+                            y++; // Check the new line at this index
+                        }
+                    }
+                    
+                    if (linesCleared > 0) {
+                        gameState.comboCounter++;
+                        const isSpecial = linesCleared === 4 || gameState.lastMoveWasRotate; // T-Spin or Tetris
+                        renderer.createLineClearParticles(firstLineY, linesCleared, isSpecial);
+                        soundManager.play(linesCleared === 4 ? 'tetris' : 'clear');
+                    } else {
+                        gameState.comboCounter = 0; // Reset combo
+                    }
+                    
+                    return linesCleared;
+                }
+
+                updateScore(linesCleared, tspinType, perfectClear) {
+                    let lineScore = 0;
+                    let voiceCall = null;
+
+                    if (perfectClear) {
+                        lineScore += SCORE_VALUES.perfectClear;
+                        voiceCall = "Perfect Clear!";
+                        uiManager.unlockAchievement('perfect');
+                    }
+                    
+                    if (tspinType > 0) {
+                        if (linesCleared === 1) lineScore += SCORE_VALUES.tspinSingle;
+                        else if (linesCleared === 2) lineScore += SCORE_VALUES.tspinDouble;
+                        else if (linesCleared === 3) lineScore += SCORE_VALUES.tspinTriple;
+                        else lineScore += SCORE_VALUES.tspin; // T-Spin, no lines
+                        voiceCall = "T-Spin";
+                    } else {
+                        if (linesCleared === 1) lineScore = SCORE_VALUES.single;
+                        else if (linesCleared === 2) lineScore = SCORE_VALUES.double;
+                        else if (linesCleared === 3) lineScore = SCORE_VALUES.triple;
+                        else if (linesCleared >= 4) {
+                            lineScore = SCORE_VALUES.tetris;
+                            voiceCall = "Tetris!";
+                            uiManager.unlockAchievement('tetris');
+                        }
+                    }
+
+                    let comboBonus = (gameState.comboCounter > 1) ? (SCORE_VALUES.combo * gameState.comboCounter * gameState.level) : 0;
+                    if (comboBonus > 0 && !voiceCall) {
+                        voiceCall = `Combo ${gameState.comboCounter}`;
+                    }
+                    
+                    gameState.score += (lineScore + comboBonus) * gameState.level;
+                    gameState.lines += linesCleared;
+                    
+                    if (voiceCall) {
+                        soundManager.playVoice(voiceCall);
+                    }
+
                     const newLevel = Math.floor(gameState.lines / LINES_PER_LEVEL) + 1;
                     if (newLevel > gameState.level) {
                         gameState.level = newLevel;
                         soundManager.updateMusic(newLevel);
-                        this.updateGameLighting(newLevel); // New
                     }
+                    
+                    // Update drop interval
                     gameState.dropInterval = (baseDropInterval * Math.pow(0.85, gameState.level - 1)) * gameState.skillFactor;
                     if (gameState.isTurbo) gameState.dropInterval = 50;
-                    
-                    // ... (achievement checks unchanged) ...
-                    if (gameState.level >= 5) uiManager.unlockAchievement('level5'); if (gameState.level >= 10) uiManager.unlockAchievement('level10'); if (gameState.lines >= 10) uiManager.unlockAchievement('line10'); if (gameState.comboCounter >= 5) uiManager.unlockAchievement('combo5');
+
+                    // Check achievements
+                    if (gameState.level >= 5) uiManager.unlockAchievement('level5');
+                    if (gameState.level >= 10) uiManager.unlockAchievement('level10');
+                    if (gameState.lines >= 10) uiManager.unlockAchievement('line10');
+                    if (gameState.comboCounter >= 5) uiManager.unlockAchievement('combo5');
                 }
                 
-                updateAdaptiveDifficulty() { /* ... (unchanged) ... */ const timeForPiece = (performance.now() - gameState.pieceTime) / 1000; const targetTime = 2.0; if (timeForPiece < targetTime) { gameState.skillFactor = Math.max(0.5, gameState.skillFactor * 0.99); } else { gameState.skillFactor = Math.min(1.0, gameState.skillFactor * 1.01); } }
-                
-                // New: Hue Shift
-                updateGameLighting(level) {
-                    const baseHue = currentTheme.hue || 200;
-                    const newHue = (baseHue + (level * 3)) % 360; // Shift 3deg per level
-                    document.documentElement.style.setProperty('--base-hue', newHue);
-                }
-                
-                // New: Idle Timer
-                resetIdleTimer() {
-                    gameState.idleTimer = 0;
-                    gameContainer.classList.remove('sleep-active');
+                updateAdaptiveDifficulty() {
+                    const timeForPiece = (performance.now() - gameState.pieceTime) / 1000; // seconds
+                    const targetTime = 2.0; // Target 2 sec per piece
+                    if (timeForPiece < targetTime) {
+                        // Player is fast, increase difficulty
+                        gameState.skillFactor = Math.max(0.5, gameState.skillFactor * 0.99); // Capped at 50%
+                    } else {
+                        // Player is slow, decrease difficulty
+                        gameState.skillFactor = Math.min(1.0, gameState.skillFactor * 1.01); // Capped at 100%
+                    }
                 }
 
                 start() {
-                    this.resetIdleTimer();
-                    // ... (rest of start() unchanged) ...
-                    gameState.board = this.createBoard(); gameState.score = 0; gameState.lines = 0; gameState.level = 1; gameState.comboCounter = 0; gameState.holdPiece = null; gameState.canSwapHold = true; gameState.isGameOver = false; gameState.isPaused = false; gameState.skillFactor = 1.0; gameState.pieceCount = 0; gameState.dropInterval = baseDropInterval; if (baseDropInterval === DIFFICULTIES.ultra) { uiManager.unlockAchievement('ultra'); } if (gameState.isTurbo) gameState.dropInterval = 50; this.updateGameLighting(1);
-                    this.spawnPiece(); renderer.drawHoldPiece();
-                    uiManager.showScreen('game'); uiManager.updateGameUI();
+                    gameState.board = this.createBoard();
+                    gameState.score = 0; gameState.lines = 0; gameState.level = 1;
+                    gameState.comboCounter = 0; gameState.holdPiece = null;
+                    gameState.canSwapHold = true; gameState.isGameOver = false; gameState.isPaused = false;
+                    gameState.skillFactor = 1.0; gameState.pieceCount = 0;
+                    gameState.dropInterval = baseDropInterval;
+                    
+                    if (baseDropInterval === DIFFICULTIES.ultra) { uiManager.unlockAchievement('ultra'); }
+                    if (gameState.isTurbo) gameState.dropInterval = 50;
+                    
+                    this.spawnPiece(); // This sets nextPiece
+                    this.spawnPiece(); // This sets currentPiece and a new nextPiece
+                    
+                    renderer.drawHoldPiece();
+                    
+                    uiManager.showScreen('game');
+                    uiManager.updateGameUI();
+                    
                     soundManager.resumeMusic();
                     if (!soundManager.beatInterval) soundManager.startMusic();
+                    
                     uiManager.unlockAchievement('start');
+                    
                     gameState.lastTime = 0;
                     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
                     this.animationFrameId = requestAnimationFrame(this.gameLoop);
                 }
-                pause() { /* ... (unchanged) ... */ if (gameState.isGameOver) return; gameState.isPaused = true; soundManager.pauseMusic(); uiManager.showScreen('pause'); if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } }
-                resume() { /* ... (unchanged) ... */ if (gameState.isGameOver) return; this.resetIdleTimer(); gameState.isPaused = false; soundManager.resumeMusic(); uiManager.showScreen('game'); gameState.lastTime = performance.now(); if (!this.animationFrameId) { this.animationFrameId = requestAnimationFrame(this.gameLoop); } }
-                gameOver() { /* ... (unchanged) ... */ gameState.isGameOver = true; gameState.isPaused = true; soundManager.stopMusic(); soundManager.play('gameOver'); uiManager.showScreen('gameOver'); if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } }
-                quit() { /* ... (unchanged) ... */ gameState.isPaused = true; soundManager.stopMusic(); if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; } screens.game.classList.remove('active'); uiManager.showScreen('menu'); }
+                
+                pause() {
+                    if (gameState.isGameOver) return;
+                    gameState.isPaused = true;
+                    soundManager.pauseMusic();
+                    uiManager.showScreen('pause');
+                    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
+                }
+                
+                resume() {
+                    if (gameState.isGameOver) return;
+                    gameState.isPaused = false;
+                    soundManager.resumeMusic();
+                    uiManager.showScreen('game');
+                    gameState.lastTime = performance.now(); 
+                    if (!this.animationFrameId) { this.animationFrameId = requestAnimationFrame(this.gameLoop); }
+                }
+                
+                gameOver() {
+                    gameState.isGameOver = true;
+                    gameState.isPaused = true; // Stop game loop
+                    soundManager.stopMusic();
+                    soundManager.play('gameOver');
+                    uiManager.showScreen('gameOver');
+                    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
+                }
+                
+                quit() {
+                    gameState.isPaused = true;
+                    soundManager.stopMusic();
+                    if (this.animationFrameId) { cancelAnimationFrame(this.animationFrameId); this.animationFrameId = null; }
+                    screens.game.classList.remove('active'); // Manually hide game screen
+                    uiManager.showScreen('menu');
+                }
 
                 gameLoop(timestamp) {
                     if (gameState.isPaused || gameState.isGameOver) return;
-
+                    
                     const deltaTime = timestamp - gameState.lastTime;
                     gameState.lastTime = timestamp;
                     
-                    // New: Idle Timer
-                    gameState.idleTimer += deltaTime;
-                    if (gameState.idleTimer > 30000) { // 30 seconds
-                        gameContainer.classList.add('sleep-active');
-                        soundManager.pauseMusic();
-                    }
-
                     gameState.dropCounter += deltaTime;
+                    
                     if (gameState.dropCounter > gameState.dropInterval) {
-                        if (!this.handleMove(0, 1)) { this.lockPiece(); }
+                        if (!this.handleMove(0, 1)) { // If move down fails
+                            this.lockPiece();
+                        }
                         gameState.dropCounter = 0;
                     }
+                    
+                    // Update particles
                     renderer.updateParticles(gameState.lineClearParticles);
                     renderer.updateParticles(gameState.particles);
-                    if (Math.random() < 0.3) { renderer.createPieceTrail(); }
-                    renderer.draw();
+                    if (Math.random() < 0.3) { // Create trails
+                        renderer.createPieceTrail();
+                    }
+                    
+                    renderer.draw(); // Redraw everything
+                    
                     this.animationFrameId = requestAnimationFrame(this.gameLoop);
                 }
             }
             const game = new Game();
             
             
-            // --- 9. INPUT HANDLERS (v4.0) ---
-            // ================================
-            
+            // --- 8. INPUT HANDLERS (v3.3) ---
             function handleKeyDown(e) {
-                if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
-                    game.resetIdleTimer();
+                // Konami Code
+                if (e.key === KONAMI_CODE[gameState.konamiIndex]) {
+                    gameState.konamiIndex++;
+                    if (gameState.konamiIndex === KONAMI_CODE.length) {
+                        alert('TURBO MODE ACTIVATED!');
+                        gameState.isTurbo = true;
+                        gameState.konamiIndex = 0;
+                        if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
+                            gameState.dropInterval = 50;
+                        }
+                    }
+                } else {
+                    gameState.konamiIndex = 0;
                 }
-                // ... (konami code unchanged) ...
-                if (e.key === KONAMI_CODE[gameState.konamiIndex]) { gameState.konamiIndex++; if (gameState.konamiIndex === KONAMI_CODE.length) { alert('TURBO MODE ACTIVATED!'); gameState.isTurbo = true; gameState.konamiIndex = 0; if (uiManager.currentScreen === 'game' && !gameState.isPaused) { gameState.dropInterval = 50; } } } else { gameState.konamiIndex = 0; }
-                if (e.target.tagName === 'INPUT') return;
                 
+                if (e.target.tagName === 'INPUT') return; // Don't control game while typing name
+
                 if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
                     switch(e.key) {
                         case 'ArrowLeft': case 'a': game.handleMove(-1, 0); break;
@@ -1331,8 +1916,11 @@
                         case 'r': game.start(); break;
                     }
                 } else {
+                     // Global keys
                      switch(e.key) {
-                         case 'p': if (uiManager.currentScreen === 'pause') game.resume(); break;
+                         case 'p':
+                             if (uiManager.currentScreen === 'pause') game.resume();
+                             break;
                          case 'Escape':
                              if (uiManager.currentScreen === 'game') game.pause();
                              else if (uiManager.currentScreen === 'pause') game.resume();
@@ -1345,109 +1933,139 @@
                 }
             }
             
-            // New: Gesture Controls
-            function setupGestureControls() {
-                let touchStartX = 0;
-                let touchStartY = 0;
-                let touchMoveX = 0;
-                let touchMoveY = 0;
-                let touchStartTime = 0;
-                const swipeThreshold = 50; // Min pixels for a swipe
-                const tapThreshold = 10;
-                const tapTime = 200; // ms
+            function setupTouchControls() {
+                if (!isMobile) return;
                 
+                touch.controls.style.display = 'block'; // Show button controls
+                
+                // Button controls
+                touch.left.addEventListener('touchstart', (e) => { e.preventDefault(); game.handleMove(-1, 0); }, { passive: false });
+                touch.right.addEventListener('touchstart', (e) => { e.preventDefault(); game.handleMove(1, 0); }, { passive: false });
+                touch.rotate.addEventListener('touchstart', (e) => { e.preventDefault(); game.handleRotate(1); }, { passive: false });
+                touch.hold.addEventListener('touchstart', (e) => { e.preventDefault(); game.handleHold(); }, { passive: false });
+                
+                let downInterval = null;
+                touch.down.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    game.handleMove(0, 1); // Move once
+                    if (downInterval) clearInterval(downInterval);
+                    downInterval = setInterval(() => { game.handleMove(0, 1); }, 100);
+                }, { passive: false });
+                touch.down.addEventListener('touchend', () => { if (downInterval) clearInterval(downInterval); downInterval = null; });
+                
+                // New: Gesture controls (on the game canvas)
                 gameCanvas.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    if (gameState.isPaused || gameState.isGameOver) return;
-                    touchStartX = e.touches[0].clientX;
-                    touchStartY = e.touches[0].clientY;
-                    touchMoveX = touchStartX;
-                    touchMoveY = touchStartY;
-                    touchStartTime = new Date().getTime();
+                    touchState.startX = e.touches[0].clientX;
+                    touchState.startY = e.touches[0].clientY;
+                    touchState.isSwiping = false;
+                    touchState.lastMove = Date.now();
                 }, { passive: false });
-                
+
                 gameCanvas.addEventListener('touchmove', (e) => {
                     e.preventDefault();
-                    if (gameState.isPaused || gameState.isGameOver) return;
+                    if (!e.touches[0]) return;
+                    touchState.moveX = e.touches[0].clientX - touchState.startX;
+                    touchState.moveY = e.touches[0].clientY - touchState.startY;
                     
-                    touchMoveX = e.touches[0].clientX;
-                    touchMoveY = e.touches[0].clientY;
-                    
-                    const deltaX = touchMoveX - touchStartX;
-                    const deltaY = touchMoveY - touchStartY;
-                    
-                    // Horizontal Swipe
-                    if (Math.abs(deltaX) > swipeThreshold) {
-                        game.handleMove(deltaX > 0 ? 1 : -1, 0);
-                        touchStartX = touchMoveX; // Reset start for next move
-                        touchStartY = touchMoveY;
+                    // Horizontal swipe
+                    const moveThreshold = BLOCK_SIZE * 0.8;
+                    const now = Date.now();
+                    if (Math.abs(touchState.moveX) > moveThreshold && (now - touchState.lastMove) > 100) {
+                        if (touchState.moveX > 0) game.handleMove(1, 0);
+                        else game.handleMove(-1, 0);
+                        touchState.startX = e.touches[0].clientX; // Reset start
+                        touchState.lastMove = now;
+                        touchState.isSwiping = true;
                     }
                     
-                    // Vertical Soft Drop
-                    if (deltaY > swipeThreshold / 2) {
+                    // Soft drop swipe
+                    if (touchState.moveY > moveThreshold && (now - touchState.lastMove) > 100) {
                         game.handleMove(0, 1);
-                        touchStartY = touchMoveY; // Reset
+                        touchState.startY = e.touches[0].clientY; // Reset start
+                        touchState.lastMove = now;
+                        touchState.isSwiping = true;
                     }
-                    
+
                 }, { passive: false });
                 
                 gameCanvas.addEventListener('touchend', (e) => {
-                    if (gameState.isPaused || gameState.isGameOver) return;
+                    e.preventDefault();
                     
-                    const deltaX = touchMoveX - touchStartX;
-                    const deltaY = touchMoveY - touchStartY;
-                    const duration = new Date().getTime() - touchStartTime;
+                    const isSwipe = Math.abs(touchState.moveX) > (BLOCK_SIZE * 0.5) || Math.abs(touchState.moveY) > (BLOCK_SIZE * 0.5);
+                    const now = Date.now();
                     
-                    // Tap for Rotate
-                    if (Math.abs(deltaX) < tapThreshold && Math.abs(deltaY) < tapThreshold && duration < tapTime) {
+                    if (!isSwipe) {
+                        // It's a tap
                         game.handleRotate(1);
-                        return;
+                        
+                        // Check for double tap (hard drop)
+                        if (now - touchState.lastTap < 300) {
+                            game.hardDrop();
+                        }
+                        touchState.lastTap = now;
+                    } else {
+                        // Check for swipe down (hard drop)
+                        if (touchState.moveY > BLOCK_SIZE * 2 && Math.abs(touchState.moveX) < BLOCK_SIZE) {
+                            game.hardDrop();
+                        }
                     }
-                    
-                    // Fast Swipe Down for Hard Drop
-                    if (deltaY > swipeThreshold && duration < 250) {
-                        game.hardDrop();
-                        return;
-                    }
+
+                    touchState.isSwiping = false;
+                    touchState.moveX = 0; touchState.moveY = 0;
                 }, { passive: false });
             }
 
-            // --- 10. BUTTON EVENT LISTENERS ---
-            // ==================================
-            
+            // --- 9. BUTTON EVENT LISTENERS ---
             function setupButtonListeners() {
-                buttons.startPlay.onclick = () => { soundManager.init(); uiManager.showScreen('menu'); };
+                // --- Start Screen ---
+                buttons.startPlay.onclick = () => {
+                    soundManager.init(); // IMPORTANT: First user interaction
+                    uiManager.showScreen('menu');
+                };
                 buttons.startSettings.onclick = () => uiManager.showScreen('settings');
+                
+                // --- Main Menu ---
                 buttons.menuNewGame.onclick = () => game.start();
                 buttons.menuLeaderboard.onclick = () => uiManager.showScreen('leaderboard');
-                buttons.menuHowToPlay.onclick = () => uiManager.showScreen('howToPlay');
+                buttons.menuHowToPlay.onclick = () => uiManager.showScreen('how-to-play-screen'); // Fixed: was 'howToPlay'
                 buttons.menuSettings.onclick = () => uiManager.showScreen('settings');
                 buttons.menuAchievements.onclick = () => uiManager.showScreen('achievements');
+                
+                // --- Pause Screen ---
                 buttons.pauseResume.onclick = () => game.resume();
                 buttons.pauseRestart.onclick = () => game.start();
                 buttons.pauseQuit.onclick = () => game.quit();
+                
+                // --- Game Over Screen ---
                 buttons.gameOverRestart.onclick = () => game.start();
                 buttons.gameOverQuit.onclick = () => { screens.game.classList.remove('active'); uiManager.showScreen('menu'); }
                 buttons.submitScore.onclick = () => {
-                    let name = ui.playerNameInput.value.toUpperCase(); if (!name) name = 'AAA';
-                    name = name.padEnd(3, 'A').substring(0, 3);
-                    uiManager.saveLeaderboard(name, gameState.score);
+                    let name = ui.playerNameInput.value.toUpperCase(); if (!name) name = 'PLAYER';
+                    name = name.substring(0, 10); // Use 10 chars
+                    
+                    // Changed: Call submitGlobalScore
+                    uiManager.submitGlobalScore(name, gameState.score);
+                    
                     screens.game.classList.remove('active');
-                    uiManager.showScreen('leaderboard');
+                    uiManager.showScreen('leaderboard'); // Show leaderboard after submit
                 };
+                
+                // --- Other Modals ---
                 buttons.leaderboardBack.onclick = () => uiManager.showScreen(uiManager.lastScreen);
                 buttons.settingsBack.onclick = () => uiManager.showScreen(uiManager.lastScreen);
                 buttons.howToPlayBack.onclick = () => uiManager.showScreen(uiManager.lastScreen);
                 buttons.achievementsBack.onclick = () => uiManager.showScreen(uiManager.lastScreen);
+                
+                // --- In-Game ---
                 buttons.pauseGame.onclick = () => game.pause();
                 
-                // New: Sliders
-                settings.soundVolume.oninput = (e) => soundManager.setFXVolume(e.target.value);
-                settings.musicVolume.oninput = (e) => soundManager.setMusicVolume(e.target.value);
-                settings.rain.onchange = (e) => weather.toggle(e.target.checked);
-                
+                // --- Settings ---
+                settings.sound.onchange = (e) => soundManager.toggleSound(e.target.checked);
+                settings.music.onchange = (e) => soundManager.toggleMusic(e.target.checked);
                 settings.difficulty.onchange = (e) => {
                     baseDropInterval = DIFFICULTIES[e.target.value] || DIFFICULTIES.normal;
+                    // Update interval if game is running
                     if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
                         gameState.dropInterval = baseDropInterval * Math.pow(0.85, gameState.level - 1) * gameState.skillFactor;
                         if (gameState.isTurbo) gameState.dropInterval = 50;
@@ -1456,85 +2074,170 @@
                 settings.theme.onchange = (e) => renderer.setTheme(e.target.value);
             }
 
-            // --- 11. BACKGROUND ANIMATION ---
-            // ================================
-            // ... (Identical) ...
+            // --- 10. BACKGROUND ANIMATION ---
             let bgParticles = [];
-            function createBgParticles() { bgParticles = []; const particleCount = Math.floor(bgCanvas.width * bgCanvas.height / 20000); for (let i = 0; i < particleCount; i++) { bgParticles.push({ x: Math.random() * bgCanvas.width, y: Math.random() * bgCanvas.height, vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5, size: Math.random() * 2 + 1, color: `rgba(0, 255, 255, ${Math.random() * 0.3 + 0.1})` }); } }
-            function animateBackground() { bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height); bgParticles.forEach(p => { p.x += p.vx; p.y += p.vy; if (p.x < 0) p.x = bgCanvas.width; if (p.x > bgCanvas.width) p.x = 0; if (p.y < 0) p.y = bgCanvas.height; if (p.y > bgCanvas.height) p.y = 0; bgCtx.fillStyle = p.color; bgCtx.beginPath(); bgCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2); bgCtx.fill(); }); bgCtx.strokeStyle = 'rgba(0, 255, 255, 0.05)'; bgCtx.lineWidth = 1; for (let i = 0; i < bgParticles.length; i++) { for (let j = i + 1; j < bgParticles.length; j++) { const dx = bgParticles[i].x - bgParticles[j].x; const dy = bgParticles[i].y - bgParticles[j].y; const dist = Math.sqrt(dx*dx + dy*dy); if (dist < 150) { bgCtx.beginPath(); bgCtx.moveTo(bgParticles[i].x, bgParticles[i].y); bgCtx.lineTo(bgParticles[j].x, bgParticles[j].y); bgCtx.stroke(); } } } requestAnimationFrame(animateBackground); }
+            function createBgParticles() {
+                bgParticles = [];
+                const particleCount = Math.floor(bgCanvas.width * bgCanvas.height / 20000);
+                for (let i = 0; i < particleCount; i++) {
+                    bgParticles.push({
+                        x: Math.random() * bgCanvas.width,
+                        y: Math.random() * bgCanvas.height,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5,
+                        size: Math.random() * 2 + 1,
+                        color: `rgba(0, 255, 255, ${Math.random() * 0.3 + 0.1})` // Faint cyan
+                    });
+                }
+            }
+
+            function animateBackground() {
+                bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+                
+                bgParticles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    // Wrap around
+                    if (p.x < 0) p.x = bgCanvas.width;
+                    if (p.x > bgCanvas.width) p.x = 0;
+                    if (p.y < 0) p.y = bgCanvas.height;
+                    if (p.y > bgCanvas.height) p.y = 0;
+                    
+                    bgCtx.fillStyle = p.color;
+                    bgCtx.beginPath();
+                    bgCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    bgCtx.fill();
+                });
+                
+                // Constellation lines
+                bgCtx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
+                bgCtx.lineWidth = 1;
+                for (let i = 0; i < bgParticles.length; i++) {
+                    for (let j = i + 1; j < bgParticles.length; j++) {
+                        const dx = bgParticles[i].x - bgParticles[j].x;
+                        const dy = bgParticles[i].y - bgParticles[j].y;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist < 150) { // Connect if close
+                            bgCtx.beginPath();
+                            bgCtx.moveTo(bgParticles[i].x, bgParticles[i].y);
+                            bgCtx.lineTo(bgParticles[j].x, bgParticles[j].y);
+                            bgCtx.stroke();
+                        }
+                    }
+                }
+                
+                requestAnimationFrame(animateBackground);
+            }
 
 
-            // --- 12. INITIALIZATION (v4.0) ---
-            // ===================================
-
+            // --- 11. INITIALIZATION (v4.0) ---
             function resizeGame() { 
                 const screenHeight = window.innerHeight;
                 const screenWidth = window.innerWidth;
                 
-                bgCanvas.width = screenWidth; bgCanvas.height = screenHeight;
-                weatherCanvas.width = screenWidth; weatherCanvas.height = screenHeight; // New
-                createBgParticles();
+                // Resize BG canvas
+                bgCanvas.width = screenWidth;
+                bgCanvas.height = screenHeight;
+                createBgParticles(); // Repopulate particles for new size
                 
-                const isMobile = screenWidth <= 860;
+                const isMobileLayout = screenWidth <= 860;
+                
                 let gameAreaHeight, gameAreaWidth;
-                if (isMobile) { gameAreaHeight = screenHeight * 0.9 - 250; gameAreaWidth = screenWidth * 0.9; } 
-                else { gameAreaHeight = screenHeight * 0.8; gameAreaWidth = screenWidth * 0.8 - 400; }
                 
+                if (isMobileLayout) {
+                    gameAreaHeight = screenHeight * 0.9 - (isMobile ? 250 : 0); // Leave space for controls on mobile
+                    gameAreaWidth = screenWidth * 0.9;
+                } else {
+                    gameAreaHeight = screenHeight * 0.8;
+                    gameAreaWidth = screenWidth * 0.8 - 400; // Leave space for side panels
+                }
+
+                // Calculate block size
                 const heightBasedBlockSize = Math.floor(gameAreaHeight / ROWS);
                 const widthBasedBlockSize = Math.floor(gameAreaWidth / COLS);
                 BLOCK_SIZE = Math.min(heightBasedBlockSize, widthBasedBlockSize);
-                if (BLOCK_SIZE < 10) BLOCK_SIZE = 10;
-                gameCanvas.width = COLS * BLOCK_SIZE; gameCanvas.height = ROWS * BLOCK_SIZE;
+                if (BLOCK_SIZE < 10) BLOCK_SIZE = 10; // Minimum size
                 
-                const nextSize = isMobile ? 80 : 120;
+                gameCanvas.width = COLS * BLOCK_SIZE;
+                gameCanvas.height = ROWS * BLOCK_SIZE;
+                
+                // Resize info canvases
+                const nextSize = isMobileLayout ? 80 : 120;
                 nextCanvas.width = nextSize; nextCanvas.height = nextSize;
                 holdCanvas.width = nextSize; holdCanvas.height = nextSize;
+                
+                // Resize info boxes to match canvas
                 document.getElementById('next-piece-box').style.width = `${nextSize}px`;
                 document.getElementById('next-piece-box').style.height = `${nextSize}px`;
                 document.getElementById('hold-piece-box').style.width = `${nextSize}px`;
                 document.getElementById('hold-piece-box').style.height = `${nextSize}px`;
-                
+
+                // Redraw game state if active
                 if (uiManager.currentScreen === 'game' && !gameState.isPaused) {
-                    renderer.draw(); renderer.drawNextPiece(); renderer.drawHoldPiece();
+                    renderer.draw();
+                    renderer.drawNextPiece();
+                    renderer.drawHoldPiece();
                 }
-                
-                weather.init(); // New
             }
             
             function init() {
-                console.log("Initializing TETRIS ULTRA v4.0...");
+                console.log("Initializing TETRIS ULTRA v4.0 (Global)...");
                 
+                // Parallax, Cursor Light, and Camera Tilt
                 window.addEventListener('mousemove', e => {
-                    const x = e.clientX; const y = e.clientY; const root = document.documentElement;
-                    const moveX = (x / window.innerWidth - 0.5) * -30;
-                    const moveY = (y / window.innerHeight - 0.5) * -30;
-                    bgCanvas.style.transform = `translate(${moveX}px, ${moveY}px) scale(1.15)`;
+                    const x = e.clientX;
+                    const y = e.clientY;
+                    const root = document.documentElement;
+                    const w = window.innerWidth;
+                    const h = window.innerHeight;
+                    
+                    // Parallax
+                    const moveX = (x / w - 0.5) * -30; // 30px max move
+                    const moveY = (y / h - 0.5) * -30;
+                    bgCanvas.style.transform = `translate(${moveX}px, ${moveY}px) translateZ(-500px) scale(1.5)`;
+                    
+                    // Cursor Light
                     root.style.setProperty('--mouse-x', `${x}px`);
                     root.style.setProperty('--mouse-y', `${y}px`);
+                    
+                    // Pulse light on move
                     root.style.setProperty('--cursor-light-size', '500px');
                     if(window.cursorTimeout) clearTimeout(window.cursorTimeout);
-                    window.cursorTimeout = setTimeout(() => { root.style.setProperty('--cursor-light-size', '400px'); }, 100);
+                    window.cursorTimeout = setTimeout(() => {
+                        root.style.setProperty('--cursor-light-size', '400px');
+                    }, 100);
+                    
+                    // Camera Tilt
+                    const tiltY = (x / w - 0.5) * -10; // Max 5 deg
+                    const tiltX = (y / h - 0.5) * 10; // Max 5 deg
+                    root.style.setProperty('--camera-rotate-y', `${tiltY}deg`);
+                    root.style.setProperty('--camera-rotate-x', `${tiltX}deg`);
+                    soundManager.updateMusicPan(tiltY / 5); // Send normalized pan
                 });
                 
                 window.addEventListener('resize', resizeGame);
                 document.addEventListener('keydown', handleKeyDown);
                 setupButtonListeners();
-                setupGestureControls(); // New
+                setupTouchControls(); // Sets up both buttons and gestures
                 
                 uiManager.loadAchievements();
                 
+                // Time-of-day theme
                 const hour = new Date().getHours();
-                if (hour >= 20 || hour < 6) { settings.theme.value = 'cyberpunk'; } 
-                else if (hour >= 6 && hour < 12) { settings.theme.value = 'pastel'; } 
-                else { settings.theme.value = 'neon'; }
+                if (hour >= 20 || hour < 6) { // 8 PM - 6 AM
+                    settings.theme.value = 'cyberpunk';
+                } else if (hour >= 6 && hour < 12) { // 6 AM - 12 PM
+                    settings.theme.value = 'pastel';
+                } else { // 12 PM - 8 PM
+                    settings.theme.value = 'neon';
+                }
                 
                 renderer.setTheme(settings.theme.value);
                 
-                resizeGame();
-                animateBackground();
-                weather.start(); // New
+                resizeGame(); // Initial size
+                animateBackground(); // Start background loop
                 
-                uiManager.showScreen('start', true);
+                uiManager.showScreen('start', true); // Show start screen immediately
             }
             
             init();
